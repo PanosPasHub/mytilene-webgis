@@ -1,6 +1,8 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import HomePage from "./pages/HomePage";
+import ReportPage from "./pages/ReportPage"; // ✅ Προσθήκη
+import ContactPage from "./pages/ContactPage"; // ✅ Προσθήκη
 
 function App() {
   return (
@@ -8,10 +10,12 @@ function App() {
       <Routes>
         {/* Home Page */}
         <Route path="/" element={<HomePage />} />
-
-        {/* Αν θέλεις, μπορείς να προσθέσεις αργότερα κι άλλες σελίδες */}
-        {/* <Route path="/map" element={<MapPage />} /> */}
-        {/* <Route path="/report" element={<ReportPage />} /> */}
+        
+        {/* Report Page - ΠΡΟΣΘΗΚΗ */}
+        <Route path="/report" element={<ReportPage />} />
+        
+        {/* Contact Page - ΠΡΟΣΘΗΚΗ */}
+        <Route path="/contact" element={<ContactPage />} />
       </Routes>
     </Router>
   );
