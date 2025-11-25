@@ -33,11 +33,13 @@ export function HeroSlider() {
       <div className="absolute inset-0 bg-black/40 flex flex-col justify-between">
         {/* Logo + Menu */}
         <nav className="flex justify-between items-center p-6 text-white">
-          <img 
-            src="/images/logo.png" 
-            alt="Mytilene Logo" 
-            className="h-16 w-16 md:h-20 md:w-20" 
-          />
+          <Link to="/">
+            <img
+            src="/images/logo.png"
+            alt="Mytilene Logo"
+            className="h-16 w-16 md:h-20 md:w-20 cursor-pointer hover:scale-105 transition-transform"
+            />
+          </Link>
           
           {/* Desktop Menu - Τελική Σειρά */}
           <ul className="hidden md:flex space-x-8 text-lg items-center">
@@ -52,6 +54,14 @@ export function HeroSlider() {
                 className="bg-cyan-500 text-white px-4 py-2 rounded-lg hover:bg-cyan-600 transition-colors"
               >
                 Αναφορά
+              </Link>
+            </li>
+            <li>
+              <Link 
+                to="/analysis" 
+                className="hover:text-cyan-300 transition-colors"
+              >
+                Αποτέλεσμα Ανάλυσης
               </Link>
             </li>
             <li>
@@ -90,6 +100,15 @@ export function HeroSlider() {
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   Αναφορά
+                </Link>
+              </li>
+              <li className="border-b border-gray-200/50">
+                <Link 
+                  to="/analysis" 
+                  className="block py-4 px-4 text-gray-800 hover:text-cyan-600 hover:bg-gray-50 rounded-lg transition-all font-medium"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  Αποτέλεσμα Ανάλυσης
                 </Link>
               </li>
               <li>

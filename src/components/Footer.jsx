@@ -6,13 +6,13 @@ export function Footer() {
     <footer id="contact" className="bg-gray-900 text-gray-300 py-10">
       <div className="max-w-4xl mx-auto px-4 space-y-6">
         {/* Logo */}
-        <div className="flex justify-center">
-          <img 
-            src="/images/logo.png" 
-            alt="Mytilene City" 
-            className="h-16 w-16"
-          />
-        </div>
+         <Link to="/" className="flex justify-center">
+            <img
+            src="/images/logo.png"
+            alt="Mytilene City"
+            className="h-16 w-16 cursor-pointer hover:scale-105 transition-transform"
+            />
+          </Link>
         
         {/* Navigation Menu - Ενημερωμένο */}
         <nav className="flex flex-wrap justify-center gap-4">
@@ -27,6 +27,12 @@ export function Footer() {
             className="hover:text-white transition text-sm md:text-base"
           >
             Αναφορά
+          </Link>
+          <Link 
+            to="/analysis" 
+            className="hover:text-white transition text-sm md:text-base"
+          >
+            Αποτέλεσμα Ανάλυσης
           </Link>
           <Link 
             to="/contact" 
