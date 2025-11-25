@@ -1,70 +1,126 @@
-# Getting Started with Create React App
+﻿# 📡 API Documentation
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+## Environmental Reports
 
-## Available Scripts
+### Submit New Report
+\\\http
+POST /api/environmental/reports
+Content-Type: application/json
 
-In the project directory, you can run:
+{
+  \"title\": \"Ζέστη στην πλατεία\",
+  \"description\": \"Πολύ ζέστη το μεσημέρι\",
+  \"temperature_feeling\": \"hot\",
+  \"noise_level\": \"medium\", 
+  \"latitude\": 39.108,
+  \"longitude\": 26.555
+}
+\\\
 
-### `npm start`
+### Get Reports as GeoJSON
+\\\http
+GET /api/environmental/reports/geojson
+\\\
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## Analysis Endpoints
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+### Heat Analysis
+\\\http
+GET /api/environmental/analysis/heat
+\\\
 
-### `npm test`
+### Spatial Hotspots
+\\\http
+GET /api/environmental/analysis/hotspots?type=heat
+GET /api/environmental/analysis/hotspots?type=noise
+\\\
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## GeoServer Management
+\\\http
+GET /api/environmental/geoserver/status
+POST /api/environmental/geoserver/views/all
+\\\
+"@ | Out-File -FilePath "documentation/API.md" -Encoding UTF8
 
-### `npm run build`
+git add documentation/
+git commit -m " Documentation: Complete setup guides & API documentation
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+ DOCUMENTATION INCLUDES:
+ Project overview and structure
+ Step-by-step installation guide
+ Complete API reference
+ Database setup instructions
+ GeoServer configuration guide
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+ PURPOSE:
+ Easy project setup for new developers
+ Comprehensive API usage examples
+ Production deployment guidance
+ Maintenance and scaling documentation"
+# Ενημέρωση του κύριου README
+@"
+#  Mytilene Environmental WebGIS - Complete Full-Stack Application
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+[![React](https://img.shields.io/badge/React-18.2.0-blue)](https://reactjs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-16+-green)](https://nodejs.org/)
+[![PostGIS](https://img.shields.io/badge/PostGIS-3.0+-orange)](https://postgis.net/)
+[![GeoServer](https://img.shields.io/badge/GeoServer-2.23-yellow)](https://geoserver.org/)
 
-### `npm run eject`
+> Complete environmental monitoring platform with real-time GIS capabilities for Mytilene
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+##  Project Structure
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+\\\
+mytilene-webgis/
+  src/                    # React Frontend Application
+  backend/               # Node.js API Server
+  documentation/         # Setup Guides & Documentation
+  README.md             # Project Overview
+  .gitignore            # Git Ignore Rules
+\\\
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+##  Features
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+###  Environmental Monitoring
+- Real-time citizen reporting system
+- Spatial analysis with PostGIS
+- Heat & noise hotspots detection
+- Interactive WebGIS interface
 
-## Learn More
+###  GIS & Mapping
+- Professional WMS layers via GeoServer
+- Custom SLD styling for data visualization
+- Spatial clustering and heatmaps
+- Multiple base map layers (OSM, Satellite)
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+###  Data Analytics
+- Time-series analysis
+- Category-based filtering
+- Statistical dashboards
+- Real-time data processing
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+##  Quick Start
 
-### Code Splitting
+See [documentation/INSTALLATION.md](documentation/INSTALLATION.md) for detailed setup instructions.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+##  Development
 
-### Analyzing the Bundle Size
+\\\ash
+# Backend (Port 5000)
+cd backend && npm install && npm run dev
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+# Frontend (Port 3000) 
+npm install && npm start
+\\\
 
-### Making a Progressive Web App
+##  API Reference
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+Complete API documentation: [documentation/API.md](documentation/API.md)
 
-### Advanced Configuration
+##  License
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+MIT License
 
-### Deployment
+---
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+**Developed for Mytilene Environmental Monitoring**
