@@ -1,12 +1,21 @@
 import React, { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+
+// --- FIX ΓΙΑ ΤΑ ΕΙΚΟΝΙΔΙΑ LEAFLET ---
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
 
 // Component που ελέγχει το κλείδωμα/ξεκλείδωμα του χάρτη και την κίνηση (FlyTo)
 const MapController = ({ isActive, selectedEvent }) => {
   const map = useMap();
 
-  // 1. Διαχείριση Zoom/Drag ανάλογα με το αν είναι ενεργός ο χάρτης
+  // 1. Διαχείριση Zoom/Drag
   useEffect(() => {
     if (isActive) {
       map.dragging.enable();
@@ -25,12 +34,13 @@ const MapController = ({ isActive, selectedEvent }) => {
     }
   }, [isActive, map]);
 
-  // 2. Πτήση στο επιλεγμένο event (ΜΟΝΟ αν υπάρχουν έγκυρες συντεταγμένες)
+  // 2. Πτήση στο επιλεγμένο event
   useEffect(() => {
-    if (selectedEvent && Array.isArray(selectedEvent.coordinates) && selectedEvent.coordinates.length === 2) {
-      map.flyTo(selectedEvent.coordinates, 15, {
-        duration: 1.5
-      });
+    // Ελέγχουμε είτε για 'coordinates' είτε για 'position' για να βρούμε τις συντεταγμένες
+    const coords = selectedEvent?.coordinates || selectedEvent?.position;
+
+    if (coords && Array.isArray(coords) && coords.length === 2) {
+      map.flyTo(coords, 16, { duration: 1.5 });
     }
   }, [selectedEvent, map]);
 
@@ -38,14 +48,20 @@ const MapController = ({ isActive, selectedEvent }) => {
 };
 
 export function CityMap({ selectedEvent, isActive, onActivate }) {
-  // Κέντρο Μυτιλήνης (Default)
   const defaultPosition = [39.1042, 26.5500];
 
-  // Helper για έλεγχο εγκυρότητας συντεταγμένων
-  // Αυτό είναι το κλειδί για να μην βγάζει το error "reading 'lat'"
-  const hasValidCoordinates = selectedEvent && 
-                              Array.isArray(selectedEvent.coordinates) && 
-                              selectedEvent.coordinates.length === 2;
+  // Helper: Εύρεση σωστών συντεταγμένων
+  // Αυτή η συνάρτηση διασφαλίζει ότι θα βρούμε τις συντεταγμένες ανεξάρτητα από το όνομα του πεδίου (coordinates ή position)
+  const getCoords = (event) => {
+    if (!event) return null;
+    const coords = event.coordinates || event.position; // Υποστήριξη και των δύο
+    if (Array.isArray(coords) && coords.length === 2 && !isNaN(coords[0])) {
+      return coords;
+    }
+    return null;
+  };
+
+  const activeCoords = getCoords(selectedEvent);
 
   return (
     <div className="relative w-full max-w-6xl h-[500px] rounded-xl overflow-hidden shadow-xl border-4 border-white mx-auto">
@@ -67,7 +83,6 @@ export function CityMap({ selectedEvent, isActive, onActivate }) {
         center={defaultPosition}
         zoom={13}
         className="w-full h-full"
-        // Απενεργοποιούμε τα πάντα αρχικά (το MapController τα διαχειρίζεται μετά)
         dragging={false}
         scrollWheelZoom={false}
         doubleClickZoom={false}
@@ -80,18 +95,23 @@ export function CityMap({ selectedEvent, isActive, onActivate }) {
         />
 
         {/* Marker: Εμφανίζεται ΜΟΝΟ αν υπάρχουν έγκυρες συντεταγμένες */}
-        {hasValidCoordinates && (
-          <Marker position={selectedEvent.coordinates}>
+        {activeCoords && (
+          <Marker 
+            key={selectedEvent.id} // Force re-render όταν αλλάζει το event
+            position={activeCoords}
+          >
             <Popup>
-              <div className="text-center p-2">
-                <h3 className="font-bold text-base">{selectedEvent.title}</h3>
-                <p className="text-sm text-gray-600">{selectedEvent.date}</p>
+              <div className="text-center p-2 min-w-[150px]">
+                <h3 className="font-bold text-base mb-1">{selectedEvent.title}</h3>
+                <p className="text-sm text-gray-600 mb-2">{selectedEvent.description}</p>
+                {selectedEvent.image && (
+                  <img src={selectedEvent.image} alt="" className="rounded w-full h-24 object-cover"/>
+                )}
               </div>
             </Popup>
           </Marker>
         )}
 
-        {/* Ο ελεγκτής του χάρτη */}
         <MapController isActive={isActive} selectedEvent={selectedEvent} />
         
       </MapContainer>
