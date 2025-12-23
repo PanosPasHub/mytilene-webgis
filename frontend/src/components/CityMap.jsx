@@ -2,11 +2,11 @@ import React, { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
-// Component που ελέγχει το κλείδωμα/ξεκλείδωμα του χάρτη
+// Component που ελέγχει το κλείδωμα/ξεκλείδωμα του χάρτη και την κίνηση (FlyTo)
 const MapController = ({ isActive, selectedEvent }) => {
   const map = useMap();
 
-  // 1. Διαχείριση Zoom/Drag ανάλογα με το isActive
+  // 1. Διαχείριση Zoom/Drag ανάλογα με το αν είναι ενεργός ο χάρτης
   useEffect(() => {
     if (isActive) {
       map.dragging.enable();
@@ -25,10 +25,10 @@ const MapController = ({ isActive, selectedEvent }) => {
     }
   }, [isActive, map]);
 
-  // 2. Πτήση στο επιλεγμένο event (αν υπάρχει)
+  // 2. Πτήση στο επιλεγμένο event (ΜΟΝΟ αν υπάρχουν έγκυρες συντεταγμένες)
   useEffect(() => {
-    if (selectedEvent && selectedEvent.coordinates) {
-      map.flyTo(selectedEvent.coordinates, 13, {
+    if (selectedEvent && Array.isArray(selectedEvent.coordinates) && selectedEvent.coordinates.length === 2) {
+      map.flyTo(selectedEvent.coordinates, 15, {
         duration: 1.5
       });
     }
@@ -40,6 +40,12 @@ const MapController = ({ isActive, selectedEvent }) => {
 export function CityMap({ selectedEvent, isActive, onActivate }) {
   // Κέντρο Μυτιλήνης (Default)
   const defaultPosition = [39.1042, 26.5500];
+
+  // Helper για έλεγχο εγκυρότητας συντεταγμένων
+  // Αυτό είναι το κλειδί για να μην βγάζει το error "reading 'lat'"
+  const hasValidCoordinates = selectedEvent && 
+                              Array.isArray(selectedEvent.coordinates) && 
+                              selectedEvent.coordinates.length === 2;
 
   return (
     <div className="relative w-full max-w-6xl h-[500px] rounded-xl overflow-hidden shadow-xl border-4 border-white mx-auto">
@@ -59,22 +65,22 @@ export function CityMap({ selectedEvent, isActive, onActivate }) {
 
       <MapContainer
         center={defaultPosition}
-        zoom={12}
+        zoom={13}
         className="w-full h-full"
         // Απενεργοποιούμε τα πάντα αρχικά (το MapController τα διαχειρίζεται μετά)
         dragging={false}
         scrollWheelZoom={false}
         doubleClickZoom={false}
         touchZoom={false}
-        zoomControl={isActive} // Εμφάνιση zoom controls μόνο όταν είναι ενεργός
+        zoomControl={isActive} 
       >
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; OpenStreetMap contributors'
         />
 
-        {/* Marker για το επιλεγμένο event */}
-        {selectedEvent && (
+        {/* Marker: Εμφανίζεται ΜΟΝΟ αν υπάρχουν έγκυρες συντεταγμένες */}
+        {hasValidCoordinates && (
           <Marker position={selectedEvent.coordinates}>
             <Popup>
               <div className="text-center p-2">
