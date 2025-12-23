@@ -3,19 +3,20 @@ import { HeroSlider } from "../components/HeroSlider";
 import { Footer } from "../components/Footer";
 import { AnalysisMap } from "../components/AnalysisMap";
 
-// Στόχευση του Backend API
-const API_URL = 'https://mytilene-webgis.onrender.com/api/noise';
+// Στόχευση του Backend API (Local ή Cloud)
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api/noise';
 
 export default function AnalysisPage() {
   // Data State
   const [allData, setAllData] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Filter States
+  // --- Filters States ---
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [timeOfDayFilter, setTimeOfDayFilter] = useState('all'); // Φίλτρο ώρας ημέρας
   
-  // Visualization State (ΝΕΟ)
-  const [visualizationMode, setVisualizationMode] = useState('points'); // 'points' ή 'heatmap'
+  // Visualization State
+  const [visualizationMode, setVisualizationMode] = useState('points');
 
   // Timeline States
   const [dateBounds, setDateBounds] = useState({ min: 0, max: 0 });
@@ -31,7 +32,6 @@ export default function AnalysisPage() {
         const data = await response.json();
         const features = data.features || [];
         
-        // Ταξινόμηση
         features.sort((a, b) => new Date(a.properties.rec_time) - new Date(b.properties.rec_time));
         
         setAllData(features);
@@ -53,22 +53,59 @@ export default function AnalysisPage() {
     fetchData();
   }, []);
 
-  // 2. Filter Logic
+  // 2. Filter Logic (Ενημερωμένη με ξεχωριστές ώρες)
   const filteredData = useMemo(() => {
     return allData.filter(feature => {
       const props = feature.properties;
-      const recTime = new Date(props.rec_time).getTime();
+      const dateObj = new Date(props.rec_time);
+      const recTime = dateObj.getTime();
+      const hour = dateObj.getHours(); // 0-23
 
-      const passTime = recTime >= selectedRange.start && recTime <= selectedRange.end;
+      // Α. Φίλτρο Timeline
+      const passDate = recTime >= selectedRange.start && recTime <= selectedRange.end;
 
+      // Β. Φίλτρο Κατηγορίας
       let passCategory = true;
       if (categoryFilter !== 'all') {
         passCategory = props.noise_source === categoryFilter;
       }
 
-      return passTime && passCategory;
+      // Γ. Φίλτρο Ώρας Ημέρας (Νέα Λογική: Ξεχωριστές Ζώνες)
+      let passTimeOfDay = true;
+      if (timeOfDayFilter !== 'all') {
+        switch (timeOfDayFilter) {
+            // --- Ώρες Αιχμής ---
+            case 'peak_morning': // 08:00 - 10:00
+                passTimeOfDay = hour >= 8 && hour < 10;
+                break;
+            case 'peak_noon':    // 13:00 - 15:00
+                passTimeOfDay = hour >= 13 && hour < 15;
+                break;
+            case 'peak_evening': // 19:00 - 22:00
+                passTimeOfDay = hour >= 19 && hour < 22;
+                break;
+            
+            // --- Ενδιάμεσες Ώρες ---
+            case 'inter_morning':   // 10:00 - 13:00
+                passTimeOfDay = hour >= 10 && hour < 13;
+                break;
+            case 'inter_afternoon': // 15:00 - 19:00
+                passTimeOfDay = hour >= 15 && hour < 19;
+                break;
+            
+            // --- Νύχτα / Υπόλοιπο ---
+            case 'night': // 22:00 - 08:00
+                passTimeOfDay = hour >= 22 || hour < 8;
+                break;
+                
+            default:
+                passTimeOfDay = true;
+        }
+      }
+
+      return passDate && passCategory && passTimeOfDay;
     });
-  }, [allData, selectedRange, categoryFilter]);
+  }, [allData, selectedRange, categoryFilter, timeOfDayFilter]);
 
   const formatDate = (timestamp) => {
     if (!timestamp) return '-';
@@ -100,7 +137,7 @@ export default function AnalysisPage() {
           
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-gray-800 mb-2">Χωρική Ανάλυση Θορύβου</h2>
-            <p className="text-gray-600">Επιλέξτε χρονικό εύρος και τρόπο απεικόνισης.</p>
+            <p className="text-gray-600">Επιλέξτε φίλτρα για να αναλύσετε τα δεδομένα της Μυτιλήνης.</p>
           </div>
 
           <div className="grid lg:grid-cols-4 gap-6">
@@ -112,9 +149,9 @@ export default function AnalysisPage() {
                   <span className="mr-2 text-xl">🔍</span> Φίλτρα & Προβολή
                 </h3>
 
-                {/* VISUALIZATION MODE TOGGLE (ΝΕΟ) */}
-                <div className="mb-8">
-                  <label className="block text-sm font-bold text-gray-700 mb-3">
+                {/* 1. VISUALIZATION MODE */}
+                <div className="mb-6">
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
                     🗺️ Τρόπος Προβολής
                   </label>
                   <div className="flex bg-gray-100 p-1 rounded-lg">
@@ -141,14 +178,40 @@ export default function AnalysisPage() {
                   </div>
                 </div>
                 
-                {/* RANGE SLIDERS */}
-                <div className="mb-8">
-                  <label className="block text-sm font-bold text-gray-700 mb-3">
-                    📅 Χρονικό Εύρος
+                {/* 2. TIME OF DAY FILTER (Detailed) */}
+                <div className="mb-6">
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    ☀️ Ώρα της Ημέρας
                   </label>
-                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-6">
+                  <select
+                      value={timeOfDayFilter}
+                      onChange={(e) => setTimeOfDayFilter(e.target.value)}
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none cursor-pointer"
+                  >
+                      <option value="all">🕒 Όλη την ημέρα</option>
+                      
+                      <option disabled className="bg-gray-100 font-bold text-gray-500">--- Ώρες Αιχμής ---</option>
+                      <option value="peak_morning">🚨 Αιχμή Πρωί (08:00 - 10:00)</option>
+                      <option value="peak_noon">🚨 Αιχμή Μεσημέρι (13:00 - 15:00)</option>
+                      <option value="peak_evening">🚨 Αιχμή Βράδυ (19:00 - 22:00)</option>
+                      
+                      <option disabled className="bg-gray-100 font-bold text-gray-500">--- Ενδιάμεσες Ώρες ---</option>
+                      <option value="inter_morning">⏳ Ενδιάμεσο Πρωί (10:00 - 13:00)</option>
+                      <option value="inter_afternoon">⏳ Ενδιάμεσο Απόγευμα (15:00 - 19:00)</option>
+                      
+                      <option disabled className="bg-gray-100 font-bold text-gray-500">--- Υπόλοιπο ---</option>
+                      <option value="night">🌙 Νύχτα / Νωρίς (22:00 - 08:00)</option>
+                  </select>
+                </div>
+
+                {/* 3. RANGE SLIDERS */}
+                <div className="mb-6">
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    📅 Ημερομηνία (Από - Έως)
+                  </label>
+                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-4">
                     <div>
-                      <div className="flex justify-between items-center mb-2">
+                      <div className="flex justify-between items-center mb-1">
                         <span className="text-xs font-bold text-cyan-700 uppercase">Απο</span>
                         <span className="text-xs font-medium text-gray-600">{formatDate(selectedRange.start)}</span>
                       </div>
@@ -162,7 +225,7 @@ export default function AnalysisPage() {
                       />
                     </div>
                     <div>
-                      <div className="flex justify-between items-center mb-2">
+                      <div className="flex justify-between items-center mb-1">
                         <span className="text-xs font-bold text-cyan-700 uppercase">Εως</span>
                         <span className="text-xs font-medium text-gray-600">{formatDate(selectedRange.end)}</span>
                       </div>
@@ -178,8 +241,8 @@ export default function AnalysisPage() {
                   </div>
                 </div>
 
-                {/* CATEGORY FILTER */}
-                <div className="mb-8">
+                {/* 4. CATEGORY FILTER */}
+                <div className="mb-6">
                   <label className="block text-sm font-bold text-gray-700 mb-2">
                     📢 Πηγή Θορύβου
                   </label>
@@ -199,7 +262,7 @@ export default function AnalysisPage() {
                   </select>
                 </div>
 
-                {/* Legend (Δυναμικό ανάλογα το mode) */}
+                {/* Legend */}
                 {visualizationMode === 'points' ? (
                   <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                     <h4 className="text-xs font-bold text-gray-500 uppercase mb-3 tracking-wider">Επίπεδα (dB)</h4>
@@ -232,7 +295,6 @@ export default function AnalysisPage() {
                     </div>
                 )}
                 
-                {/* Περνάμε το visualizationMode στον χάρτη */}
                 <AnalysisMap 
                   reports={filteredData} 
                   mode={visualizationMode}

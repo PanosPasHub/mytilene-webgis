@@ -1,65 +1,93 @@
-import React, { useEffect } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
-import L from "leaflet";
+import React, { useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 
-// Component για να πετάει η κάμερα στο επιλεγμένο event
-function FlyToEvent({ selectedEvent }) {
-  const map = useMap(); // Λαμβάνει το map instance από το context
+// Component που ελέγχει το κλείδωμα/ξεκλείδωμα του χάρτη
+const MapController = ({ isActive, selectedEvent }) => {
+  const map = useMap();
 
-  useEffect(() => { // Όταν αλλάζει το selectedEvent, πετάει η κάμερα σε αυτό
-    if (selectedEvent) {
-      map.flyTo(selectedEvent.position, 16, { duration: 1.5 }); // Πετάει στην τοποθεσία με zoom 16 και διάρκεια 1.5 δευτερόλεπτα
+  // 1. Διαχείριση Zoom/Drag ανάλογα με το isActive
+  useEffect(() => {
+    if (isActive) {
+      map.dragging.enable();
+      map.scrollWheelZoom.enable();
+      map.touchZoom.enable();
+      map.doubleClickZoom.enable();
+      map.keyboard.enable();
+      if (map.tap) map.tap.enable();
+    } else {
+      map.dragging.disable();
+      map.scrollWheelZoom.disable();
+      map.touchZoom.disable();
+      map.doubleClickZoom.disable();
+      map.keyboard.disable();
+      if (map.tap) map.tap.disable();
+    }
+  }, [isActive, map]);
+
+  // 2. Πτήση στο επιλεγμένο event (αν υπάρχει)
+  useEffect(() => {
+    if (selectedEvent && selectedEvent.coordinates) {
+      map.flyTo(selectedEvent.coordinates, 13, {
+        duration: 1.5
+      });
     }
   }, [selectedEvent, map]);
 
-  return null; // Δεν αποδίδει τίποτα στο DOM
-}
+  return null;
+};
 
-export function CityMap({ selectedEvent }) {
-  // Function για άνοιγμα Google Maps
-  const openInGoogleMaps = (lat, lng, title) => {
-    const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}&query_place_id=${encodeURIComponent(title)}`;
-    window.open(url, '_blank');// Άνοιγμα σε νέα καρτέλα
-  };
+export function CityMap({ selectedEvent, isActive, onActivate }) {
+  // Κέντρο Μυτιλήνης (Default)
+  const defaultPosition = [39.1042, 26.5500];
 
   return (
-    <div className="w-[90%] h-[500px] rounded-xl shadow-md overflow-hidden">{/* Κοντέινερ για τον χάρτη με στυλ */}
+    <div className="relative w-full max-w-6xl h-[500px] rounded-xl overflow-hidden shadow-xl border-4 border-white mx-auto">
+      
+      {/* Overlay: Καλύπτει τον χάρτη όταν είναι ανενεργός */}
+      {!isActive && (
+        <div 
+          onClick={onActivate}
+          className="absolute inset-0 z-[1000] bg-black bg-opacity-10 flex items-center justify-center cursor-pointer hover:bg-opacity-20 transition-all group"
+        >
+          <div className="bg-white px-6 py-3 rounded-full shadow-lg transform group-hover:scale-105 transition-transform flex items-center gap-2">
+            <span className="text-2xl">👆</span>
+            <span className="font-bold text-gray-700">Κάντε κλικ για εξερεύνηση</span>
+          </div>
+        </div>
+      )}
+
       <MapContainer
-        center={[39.108, 26.555]}
-        zoom={14}
-        className="h-full w-full" // Ο χάρτης καταλαμβάνει όλο το κοντέινερ
+        center={defaultPosition}
+        zoom={12}
+        className="w-full h-full"
+        // Απενεργοποιούμε τα πάντα αρχικά (το MapController τα διαχειρίζεται μετά)
+        dragging={false}
+        scrollWheelZoom={false}
+        doubleClickZoom={false}
+        touchZoom={false}
+        zoomControl={isActive} // Εμφάνιση zoom controls μόνο όταν είναι ενεργός
       >
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution="&copy; OpenStreetMap contributors"
+          attribution='&copy; OpenStreetMap contributors'
         />
+
+        {/* Marker για το επιλεγμένο event */}
         {selectedEvent && (
-          <Marker 
-            position={selectedEvent.position} 
-            icon={L.icon({ 
-              iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png" 
-            })}
-          >
+          <Marker position={selectedEvent.coordinates}>
             <Popup>
-              <div className="text-center">
-                <h3 className="font-bold text-lg">{selectedEvent.title}</h3>
-                <p className="text-sm text-gray-600 mb-2">{selectedEvent.description}</p>
-                <button 
-                  onClick={() => openInGoogleMaps(// επικλήση της function για άνοιγμα Google Maps στο κλικ listener
-                    selectedEvent.position[0], // latitude
-                    selectedEvent.position[1], // longitude
-                    selectedEvent.title
-                  )}
-                  className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 transition text-sm"
-                >
-                  📍 Άνοιγμα στο Google Maps
-                </button>
+              <div className="text-center p-2">
+                <h3 className="font-bold text-base">{selectedEvent.title}</h3>
+                <p className="text-sm text-gray-600">{selectedEvent.date}</p>
               </div>
             </Popup>
           </Marker>
         )}
-        <FlyToEvent selectedEvent={selectedEvent} />
+
+        {/* Ο ελεγκτής του χάρτη */}
+        <MapController isActive={isActive} selectedEvent={selectedEvent} />
+        
       </MapContainer>
     </div>
   );
