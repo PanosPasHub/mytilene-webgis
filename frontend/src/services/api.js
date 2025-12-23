@@ -1,14 +1,22 @@
-// src/services/api.js
+// 1. Δυναμική Ρύθμιση URL
+// Ελέγχουμε αν υπάρχει μεταβλητή στο Netlify. 
+// Αν η μεταβλητή τελειώνει σε "/noise", το αφαιρούμε για να έχουμε καθαρό το Base URL (.../api).
+const getBaseUrl = () => {
+  const envUrl = process.env.REACT_APP_API_URL;
+  if (envUrl) {
+    return envUrl.endsWith('/noise') ? envUrl.replace('/noise', '') : envUrl;
+  }
+  return 'http://localhost:5000/api';
+};
 
-// Ρύθμιση της διεύθυνσης του Server
-// Βεβαιώσου ότι ο server τρέχει στο port 5000
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = getBaseUrl();
 
 /**
  * Κεντρική συνάρτηση για όλες τις κλήσεις προς το API.
  * Διαχειρίζεται τα Headers, τη μετατροπή JSON και τα σφάλματα.
  */
 const apiCall = async (endpoint, options = {}) => {
+  // Προσοχή: Επειδή το API_BASE_URL τελειώνει σε /api, και το endpoint ξεκινάει με /, είμαστε οκ.
   const url = `${API_BASE_URL}${endpoint}`;
   
   console.log('📡 API Call:', url, options.method || 'GET');
@@ -23,25 +31,21 @@ const apiCall = async (endpoint, options = {}) => {
       ...options,
     };
 
-    // Αφαίρεση body για GET requests (δεν επιτρέπεται body στα GET)
+    // Αφαίρεση body για GET requests
     if (config.method === 'GET') {
       delete config.body;
     }
 
     const response = await fetch(url, config);
     
-    // --- ΕΛΕΓΧΟΣ ΣΦΑΛΜΑΤΩΝ (Βελτιωμένη & Απλοποιημένη Λογική) ---
+    // --- ΕΛΕΓΧΟΣ ΣΦΑΛΜΑΤΩΝ ---
     if (!response.ok) {
-      // 1. Διαβάζουμε την απάντηση ως κείμενο
       const errorText = await response.text();
-      let errorMessage = `HTTP Error ${response.status}`; // Default μήνυμα αν αποτύχουν τα υπόλοιπα
+      let errorMessage = `HTTP Error ${response.status}`;
 
       try {
-          // 2. Προσπάθεια να διαβάσουμε το JSON από τον server
           const errorJson = JSON.parse(errorText);
           
-          // 3. Ψάχνουμε το σωστό πεδίο για το μήνυμα
-          // Προτεραιότητα: message > error > όλο το JSON string
           if (errorJson.message) {
             errorMessage = errorJson.message;
           } else if (errorJson.error) {
@@ -51,19 +55,16 @@ const apiCall = async (endpoint, options = {}) => {
           }
           
       } catch (e) {
-          // 4. Αν δεν είναι JSON (π.χ. HTML page), κρατάμε το κείμενο αν υπάρχει
           if (errorText) {
              errorMessage = `Σφάλμα (${response.status}): ${errorText.substring(0, 100)}`; 
           }
       }
 
-      // 5. Πετάμε το τελικό καθαρό μήνυμα για να το δείξει το ReportPage
       throw new Error(errorMessage);
     }
 
     // --- ΕΠΙΤΥΧΙΑ ---
     const text = await response.text();
-    // Αν υπάρχει απάντηση, την κάνουμε parse, αλλιώς επιστρέφουμε κενό αντικείμενο
     const data = text ? JSON.parse(text) : {};
     
     console.log('✅ API Success:', data);
@@ -71,11 +72,9 @@ const apiCall = async (endpoint, options = {}) => {
     
   } catch (error) {
     console.error('❌ API Error:', error.message);
-    // Αν είναι σφάλμα δικτύου (π.χ. Failed to fetch), βάζουμε πρόθεμα.
     if (error.message === 'Failed to fetch') {
-        throw new Error('Δεν ήταν δυνατή η σύνδεση με τον Server. Ελέγξτε αν είναι ενεργός.');
+        throw new Error('Δεν ήταν δυνατή η σύνδεση με τον Server. Ελέγξτε τη σύνδεσή σας.');
     }
-    // Αναμετάδοση του σφάλματος όπως είναι
     throw error;
   }
 };
@@ -89,8 +88,8 @@ export const environmentalAPI = {
       body: JSON.stringify(reportData),
     }),
 
-  // 2. Λήψη GeoJSON (Για μελλοντική χρήση στον χάρτη)
-  getNoiseGeoJSON: () => apiCall('/noise/geojson'),
+  // 2. Λήψη GeoJSON (Αν χρειαστεί στο μέλλον)
+  getNoiseGeoJSON: () => apiCall('/noise'), 
 };
 
 // Έλεγχος Υγείας Server

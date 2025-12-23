@@ -4,7 +4,7 @@ import { Footer } from "../components/Footer";
 import { AnalysisMap } from "../components/AnalysisMap";
 
 // Στόχευση του Backend API
-const API_URL = 'http://localhost:5000/api/noise';
+const API_URL = 'https://mytilene-webgis.onrender.com/api/noise';
 
 export default function AnalysisPage() {
   // Data State
