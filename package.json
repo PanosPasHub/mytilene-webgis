@@ -1,0 +1,7 @@
+{
+  "name": "mytilene-webgis-full",
+  "scripts": {
+    "dev": "concurrently \"cd backend && npm start\" \"cd frontend && npm start\"",
+    "start": "npm run dev"
+  }
+}

@@ -6,7 +6,7 @@ import { MustDoSection } from "../components/MustDoSection";
 import { Footer } from "../components/Footer";
 import { events } from "../data/eventsData";
 import L from "leaflet";
-
+// κατεβάζουμε τα εικονίδια του Leaflet από CDN
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
@@ -15,7 +15,7 @@ L.Icon.Default.mergeOptions({
 });
 
 export default function HomePage() {
-  // ΠΡΟΣΘΕΣΕ ΑΥΤΟ - λείπει το useState!
+  // φτιαχνω την μνημη selectedEvent για να κραταω το επιλεγμενο γεγονος απο το carousel
   const [selectedEvent, setSelectedEvent] = useState(null);
 
   return (

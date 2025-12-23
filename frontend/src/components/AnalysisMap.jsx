@@ -1,9 +1,10 @@
-import React from 'react';
-import { MapContainer, TileLayer, WMSTileLayer, LayersControl, GeoJSON, Marker, Popup } from 'react-leaflet';
-import L from 'leaflet';
+import React, { useEffect } from 'react';
+import { MapContainer, TileLayer, CircleMarker, Popup, LayersControl, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+import 'leaflet.heat'; // Απαιτεί npm install leaflet.heat
 
-// Fix για τα marker icons
+// Fix για τα εικονίδια του Leaflet που χάνονται στο React
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
@@ -11,222 +12,162 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-// 🆕 Custom icons για διαφορετικές κατηγορίες
-const createCustomIcon = (color) => {
-  return new L.Icon({
-    iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${color}.png`,
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
-    shadowSize: [41, 41]
-  });
-};
+// --- HEATMAP LAYER COMPONENT ---
+// Αυτό το υπο-component αναλαμβάνει να ζωγραφίσει το Heatmap πάνω στον χάρτη
+const HeatmapLayer = ({ points }) => {
+  const map = useMap(); // Πρόσβαση στο αντικείμενο χάρτη του Leaflet
 
-const customIcons = {
-  unbearable: createCustomIcon('red'),     // 🔴 Αφόρητη ζέστη
-  hot: createCustomIcon('orange'),         // 🟠 Ζεστό
-  very_high: createCustomIcon('violet'),   // 🟣 Πολύ υψηλός θόρυβος
-  high: createCustomIcon('purple'),        // 🟣 Υψηλός θόρυβος
-  pollution: createCustomIcon('grey'),     // ⚫ Ρύπανση
-  default: createCustomIcon('blue')        // 🔵 Default
-};
+  useEffect(() => {
+    if (!points || points.length === 0) return;
 
-export function AnalysisMap({ reports = [], hotspots = { heat: [], noise: [] }, activeLayers, filters }) {
-  
-  // GeoServer WMS Configuration - ΔΙΟΡΘΩΜΕΝΟ
-  const geoserverConfig = {
-    baseUrl: 'http://localhost:8080/geoserver',
-    workspace: 'mytilenegis', // Χρησιμοποιείς mytilenegis workspace
-    layers: {
-      reports: 'mytilenegis:environmental_reports',    // Διορθωμένο layer name
-      heat: 'mytilenegis:heat_analysis',               // Θα το δημιουργήσουμε
-      noise: 'mytilenegis:noise_hotspots'              // Θα το δημιουργήσουμε
-    }
-  };
-  
-  // Function για να βρίσκει το σωστό icon βάσει των properties
-  const getIconForReport = (properties) => {
-    if (properties.temperatureFeeling === 'unbearable') return customIcons.unbearable;
-    if (properties.temperatureFeeling === 'hot') return customIcons.hot;
-    if (properties.noiseLevel === 'very_high') return customIcons.very_high;
-    if (properties.noiseLevel === 'high') return customIcons.high;
-    if (properties.pollutionType) return customIcons.pollution;
-    return customIcons.default;
-  };
-
-  // Function για να δημιουργεί markers από τα reports
-  const renderReportMarkers = () => {
-    if (!activeLayers.reports || !reports.length) return null;
-
-    return reports.map((report, index) => {
-      const { geometry, properties } = report;
-      
-      // Skip αν δεν υπάρχουν coordinates
-      if (!geometry || !geometry.coordinates || geometry.coordinates.length !== 2) {
-        console.warn('Invalid report coordinates:', report);
-        return null;
-      }
-
-      const [lng, lat] = geometry.coordinates;
-      const icon = getIconForReport(properties);
-
-      return (
-        <Marker
-          key={properties.id || `report-${index}`}
-          position={[lat, lng]}
-          icon={icon}
-        >
-          <Popup>
-            <div className="p-2 min-w-[200px]">
-              <h3 className="font-bold text-lg mb-2">{properties.title}</h3>
-              <div className="space-y-1 text-sm">
-                <p><strong>Θερμική Δυσφορία:</strong> {properties.temperatureFeeling || 'N/A'}</p>
-                <p><strong>Θόρυβος:</strong> {properties.noiseLevel || 'N/A'}</p>
-                <p><strong>Ρύπανση:</strong> {properties.pollutionType || 'Καμία'}</p>
-                <p><strong>Επείγον:</strong> {properties.urgency || 'Μέτριο'}</p>
-                <p className="text-xs text-gray-500">
-                  {new Date(properties.createdDate).toLocaleString('el-GR')}
-                </p>
-              </div>
-            </div>
-          </Popup>
-        </Marker>
-      );
+    // Μετατροπή των GeoJSON δεδομένων στη μορφή που θέλει το leaflet.heat: [lat, lon, intensity]
+    const heatPoints = points.map(p => {
+        const db = parseFloat(p.properties.noise_db_val);
+        const lat = p.geometry.coordinates[1];
+        const lon = p.geometry.coordinates[0];
+        
+        // Υπολογισμός Έντασης (Intensity): 
+        // Κανονικοποιούμε τα dB ώστε να είναι μεταξύ 0.0 και 1.0
+        // Υποθέτουμε: <40dB = 0.1 (ελάχιστο), >100dB = 1.0 (μέγιστο)
+        const intensity = Math.min(Math.max((db - 40) / 60, 0.1), 1.0);
+        
+        return [lat, lon, intensity];
     });
+
+    // Δημιουργία του HeatLayer
+    const heat = L.heatLayer(heatPoints, {
+        radius: 35,      // Ακτίνα επιρροής κάθε σημείου (pixels)
+        blur: 25,        // Πόσο "θολό" είναι το heatmap
+        maxZoom: 15,     // Μέχρι ποιο zoom level υπολογίζεται η μέγιστη ένταση
+        max: 1.0,        
+        // Χρωματική διαβάθμιση (Gradient)
+        gradient: {      
+            0.2: 'blue',   // Χαμηλός θόρυβος
+            0.4: 'cyan',
+            0.6: 'lime',   // Μέτριος
+            0.8: 'yellow', // Υψηλός
+            1.0: 'red'     // Επικίνδυνος
+        }
+    }).addTo(map);
+
+    // Cleanup: Καθαρισμός του layer όταν αλλάζουν τα δεδομένα ή κλείνει το component
+    return () => {
+      map.removeLayer(heat);
+    };
+  }, [points, map]);
+
+  return null;
+};
+
+// --- MAIN MAP COMPONENT ---
+export function AnalysisMap({ reports = [], mode = 'points' }) {
+  
+  // Χρωματισμός για τα Clusters (Points Mode)
+  const getColor = (db) => {
+    if (db > 80) return '#dc2626'; // Κόκκινο
+    if (db > 65) return '#f97316'; // Πορτοκαλί
+    if (db > 50) return '#facc15'; // Κίτρινο
+    return '#22c55e';             // Πράσινο
   };
 
-  // Styling για hotspots (για τα GeoJSON polygons)
-  const getHotspotStyle = (type) => {
-    const colors = {
-      heat: { color: '#ff4444', weight: 4, fillOpacity: 0.2 },
-      noise: { color: '#ff00ff', weight: 4, fillOpacity: 0.2 }
+  // Μετάφραση πηγών θορύβου
+  const getSourceLabel = (source) => {
+    const mapping = {
+      'nature': 'Φυσικό Περιβάλλον',
+      'traffic': 'Οδική Κυκλοφορία',
+      'construction': 'Εργοτάξιο / Κατασκευές',
+      'music': 'Έντονη Μουσική / Διασκέδαση',
+      'human': 'Ανθρώπινη Ομιλία / Πλήθος',
+      'industrial': 'Βιομηχανικός Θόρυβος',
+      'other': 'Άλλο'
     };
-    return colors[type] || { color: '#3388ff', weight: 3, fillOpacity: 0.1 };
+    return mapping[source?.toLowerCase()] || source || 'Άγνωστο';
   };
 
   return (
-    <div className="w-full h-[600px] rounded-lg overflow-hidden">
+    <div className="relative w-full h-full min-h-[500px]">
       <MapContainer
-        center={[39.108, 26.555]}
+        center={[39.106, 26.554]} // Κέντρο Μυτιλήνης
         zoom={14}
-        className="h-full w-full"
+        className="w-full h-full rounded-lg z-0"
+        style={{ minHeight: "100%" }}
       >
-        {/* Base OSM TileLayer */}
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution="&copy; OpenStreetMap contributors"
-        />
-
         <LayersControl position="topright">
-          
-          {/* 🆕 GeoServer WMS Layers */}
-          {activeLayers.geoserverReports && (
-            <LayersControl.Overlay name="🗺️ GeoServer Reports">
-              <WMSTileLayer
-                url={`${geoserverConfig.baseUrl}/wms`}
-                layers={geoserverConfig.layers.reports}
-                format="image/png"
-                transparent={true}
-                opacity={0.8}
-                version="1.1.0"
-                styles=""  // Θα προσθέσουμε styles αργότερα
-              />
+          {/* Base Layers (Υπόβαθρα) */}
+          <LayersControl.BaseLayer checked name="OpenStreetMap">
+            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap' />
+          </LayersControl.BaseLayer>
+          <LayersControl.BaseLayer name="Dark Matter">
+            <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" attribution='&copy; CartoDB' />
+          </LayersControl.BaseLayer>
+
+          {/* MODE 1: POINTS (Κουκκίδες) */}
+          {mode === 'points' && (
+            <LayersControl.Overlay checked name="Σημεία Μετρήσεων">
+                <React.Fragment>
+                  {reports.map((feature, index) => {
+                    const coords = feature.geometry.coordinates;
+                    const lat = coords[1];
+                    const lon = coords[0];
+                    const props = feature.properties;
+                    const dbVal = parseFloat(props.noise_db_val); 
+
+                    return (
+                      <CircleMarker
+                        key={props.report_id || index}
+                        center={[lat, lon]}
+                        pathOptions={{ 
+                          color: 'white', 
+                          weight: 1, 
+                          fillColor: getColor(dbVal), 
+                          fillOpacity: 0.8 
+                        }}
+                        radius={10} 
+                      >
+                        <Popup>
+                          <div className="p-1 min-w-[200px]">
+                            <div className="flex items-center justify-between border-b pb-2 mb-2 border-gray-200">
+                              <span className="font-bold text-lg text-gray-800">{dbVal} dB</span>
+                              <span className={`text-xs px-2 py-1 rounded text-white ${
+                                   dbVal > 80 ? 'bg-red-500' : dbVal > 65 ? 'bg-orange-500' : 'bg-green-500'
+                               }`}>
+                                 {dbVal > 80 ? 'Επικίνδυνο' : dbVal > 65 ? 'Υψηλό' : 'Χαμηλό'}
+                               </span>
+                            </div>
+                            <div className="text-sm space-y-2 text-gray-700">
+                              <p>🕒 {new Date(props.rec_time).toLocaleString('el-GR')}</p>
+                              <p>📢 {getSourceLabel(props.noise_source)}</p>
+                              <p>😠 Ενόχληση: <strong>{props.annoyance_level || '-'}</strong>/10</p>
+                            </div>
+                          </div>
+                        </Popup>
+                      </CircleMarker>
+                    );
+                  })}
+                </React.Fragment>
             </LayersControl.Overlay>
           )}
 
-          {activeLayers.geoserverHeat && (
-            <LayersControl.Overlay name="🔥 GeoServer Heat Analysis">
-              <WMSTileLayer
-                url={`${geoserverConfig.baseUrl}/wms`}
-                layers={geoserverConfig.layers.heat}
-                format="image/png"
-                transparent={true}
-                opacity={0.7}
-                version="1.1.0"
-              />
-            </LayersControl.Overlay>
-          )}
-
-          {activeLayers.geoserverNoise && (
-            <LayersControl.Overlay name="🔊 GeoServer Noise Hotspots">
-              <WMSTileLayer
-                url={`${geoserverConfig.baseUrl}/wms`}
-                layers={geoserverConfig.layers.noise}
-                format="image/png"
-                transparent={true}
-                opacity={0.7}
-                version="1.1.0"
-              />
-            </LayersControl.Overlay>
-          )}
-
-          {/* React-based Layers */}
-          {activeLayers.reports && (
-            <LayersControl.Overlay name="📊 React Reports" checked>
-              {renderReportMarkers()}
-            </LayersControl.Overlay>
-          )}
-
-          {/* Hotspots Layers */}
-          {activeLayers.heatHotspots && hotspots.heat && hotspots.heat.length > 0 && (
-            <LayersControl.Overlay name="🔥 Heat Hotspots (React)">
-              <GeoJSON
-                data={{
-                  type: "FeatureCollection",
-                  features: hotspots.heat.map(hotspot => ({
-                    type: "Feature",
-                    geometry: hotspot.geometry ? JSON.parse(hotspot.geometry) : null,
-                    properties: {
-                      report_count: hotspot.report_count,
-                      heat_ratio: hotspot.heat_ratio
-                    }
-                  })).filter(feature => feature.geometry !== null)
-                }}
-                style={() => getHotspotStyle('heat')}
-                onEachFeature={(feature, layer) => {
-                  layer.bindPopup(`
-                    <div class="p-2">
-                      <h4 class="font-bold">🔥 Hotspot Ζέστης</h4>
-                      <p>Αναφορές: ${feature.properties.report_count}</p>
-                      <p>Ποσοστό Ζέστης: ${(feature.properties.heat_ratio * 100).toFixed(1)}%</p>
-                    </div>
-                  `);
-                }}
-              />
-            </LayersControl.Overlay>
-          )}
-
-          {activeLayers.noiseHotspots && hotspots.noise && hotspots.noise.length > 0 && (
-            <LayersControl.Overlay name="🔊 Noise Hotspots (React)">
-              <GeoJSON
-                data={{
-                  type: "FeatureCollection",
-                  features: hotspots.noise.map(hotspot => ({
-                    type: "Feature",
-                    geometry: hotspot.geometry ? JSON.parse(hotspot.geometry) : null,
-                    properties: {
-                      report_count: hotspot.report_count,
-                      noise_ratio: hotspot.noise_ratio
-                    }
-                  })).filter(feature => feature.geometry !== null)
-                }}
-                style={() => getHotspotStyle('noise')}
-                onEachFeature={(feature, layer) => {
-                  layer.bindPopup(`
-                    <div class="p-2">
-                      <h4 class="font-bold">🔊 Hotspot Θορύβου</h4>
-                      <p>Αναφορές: ${feature.properties.report_count}</p>
-                      <p>Ποσοστό Θορύβου: ${(feature.properties.noise_ratio * 100).toFixed(1)}%</p>
-                    </div>
-                  `);
-                }}
-              />
-            </LayersControl.Overlay>
+          {/* MODE 2: HEATMAP (Θερμικός Χάρτης) */}
+          {mode === 'heatmap' && (
+              // Το Heatmap δεν χρειάζεται Overlay wrapper καθώς το χειρίζεται το useEffect
+              <HeatmapLayer points={reports} />
           )}
 
         </LayersControl>
       </MapContainer>
+      
+      {/* Στατιστικό στο κάτω μέρος */}
+      <div className="absolute bottom-6 left-6 z-[900] bg-white bg-opacity-90 backdrop-blur px-4 py-3 rounded-lg shadow-xl border border-gray-200 text-sm flex items-center gap-3">
+        <div className="flex flex-col">
+            <span className="text-xs text-gray-500 uppercase font-bold tracking-wider">Εμφανιζονται</span>
+            <span className="font-bold text-2xl text-cyan-700">{reports.length}</span>
+        </div>
+        <div className="h-8 w-px bg-gray-300 mx-1"></div>
+        <div className="text-xs text-gray-600">
+            μετρήσεις<br/>στο χάρτη
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,35 +1,33 @@
 const express = require('express');
 const cors = require('cors');
+// Φόρτωση μεταβλητών περιβάλλοντος
 require('dotenv').config();
 
-const environmentalRoutes = require('./routes/environmental');
+// Import των Routes (που περιέχουν τη λογική)
+const noiseRoutes = require('./routes/noiseRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
-app.use(cors({
-  origin: 'http://localhost:3000', // React development server
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-app.use(express.json());
+// --- Middleware ---
+app.use(cors()); // Επιτρέπει κλήσεις από το React (localhost:3000)
+app.use(express.json()); // Για να διαβάζει JSON body στα requests
 
-// Routes
-app.use('/api/environmental', environmentalRoutes);
+// --- Routes Middleware ---
+// Όλες οι κλήσεις που ξεκινάνε με /api/noise κατευθύνονται στο noiseRoutes
+app.use('/api/noise', noiseRoutes);
 
-// Health check
+// Global Health Check (Για γρήγορο έλεγχο ότι ο server τρέχει)
 app.get('/api/health', (req, res) => {
   res.json({ 
-    status: 'OK', 
-    message: 'Mytilene Environmental API is running',
-    timestamp: new Date().toISOString()
+    status: 'UP', 
+    system: 'Mytilene Noise Watch Backend', 
+    timestamp: new Date() 
   });
 });
 
-// Start server
+// --- Start Server ---
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📊 Environmental API: http://localhost:${PORT}/api/environmental`);
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`🔗 API Routes mounted at /api/noise`);
 });
