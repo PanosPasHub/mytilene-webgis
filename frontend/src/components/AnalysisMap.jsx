@@ -76,16 +76,6 @@ export function AnalysisMap({ reports = [], mode = 'points' }) {
 
   return (
     <div className="w-full h-full relative">
-      
-      {/* CSS HACK: Κρύβουμε το κουμπί LayersControl από τον χρήστη */}
-      <style>
-        {`
-          .leaflet-control-layers {
-            display: none !important;
-          }
-        `}
-      </style>
-
       <MapContainer 
         center={position} 
         zoom={14} 
