@@ -1,7 +1,9 @@
 import React, { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import 'leaflet.heat';
 
 // --- Διόρθωση εικονιδίων Leaflet για σωστή εμφάνιση στο React ---
 delete L.Icon.Default.prototype._getIconUrl;
@@ -11,24 +13,38 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-/**
- * Εσωτερικό Component για τη διαχείριση της προβολής Heatmap.
- * Σημείωση: Για πλήρη λειτουργία heatmap απαιτείται το 'leaflet.heat'.
- * Εδώ παρέχεται η δομή για να λειτουργεί ο χάρτης χωρίς σφάλματα build.
- */
-function SimpleHeatmapLayer({ points }) {
+// Εσωτερικό Component για τη διαχείριση του Heatmap Layer
+function HeatmapLayer({ points }) {
   const map = useMap();
 
   useEffect(() => {
     if (!map || !points || points.length === 0) return;
-    
-    // Εδώ μπορεί να προστεθεί η λογική L.heatLayer αν είναι εγκατεστημένο το πακέτο
+
+    // Προετοιμασία δεδομένων για το Heatmap [lat, lng, intensity]
+    const heatData = points.map(p => [
+      p.geometry.coordinates[1],
+      p.geometry.coordinates[0],
+      parseFloat(p.properties.noise_db_val) / 100 // Κανονικοποίηση έντασης
+    ]);
+
+    // Δημιουργία του Heatmap Layer
+    const heatLayer = L.heatLayer(heatData, {
+      radius: 25,
+      blur: 15,
+      maxZoom: 17,
+      gradient: { 0.4: 'blue', 0.6: 'cyan', 0.7: 'lime', 0.8: 'yellow', 1: 'red' }
+    }).addTo(map);
+
+    // Καθαρισμός κατά την αλλαγή mode ή unmount
+    return () => {
+      map.removeLayer(heatLayer);
+    };
   }, [map, points]);
 
   return null;
 }
 
-// Helper για δυναμικό ορισμό χρώματος εικονιδίου ανάλογα με τα dB
+// Helper για το χρώμα των Markers ανάλογα με τα dB
 const getMarkerIcon = (db) => {
   let color = '#22c55e'; // Πράσινο < 50
   if (db >= 50 && db < 65) color = '#facc15'; // Κίτρινο
@@ -44,8 +60,8 @@ const getMarkerIcon = (db) => {
 
 /**
  * AnalysisMap Component
- * Αφαιρέθηκε το LayersControl για μια πιο καθαρή διεπαφή.
- * Ο χάρτης ανταποκρίνεται στο 'mode' (points/heatmap) από το sidebar.
+ * Περιλαμβάνει Clustering και Heatmap. 
+ * Το LayersControl έχει αφαιρεθεί για καθαρή διεπαφή.
  */
 export function AnalysisMap({ reports, mode }) {
   const position = [39.1042, 26.5500]; // Κέντρο Μυτιλήνης
@@ -58,43 +74,43 @@ export function AnalysisMap({ reports, mode }) {
         className="w-full h-full"
         zoomControl={true}
       >
-        {/* Στατικό υπόβαθρο χάρτη - Χωρίς επιλογέα επιπέδων (LayersControl) */}
+        {/* Στατικό υπόβαθρο χάρτη - Χωρίς LayersControl */}
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
 
-        {/* Προβολή Σημείων */}
-        {mode === 'points' && reports.map((report, idx) => {
-          const db = parseFloat(report.properties.noise_db_val);
-          const coords = [report.geometry.coordinates[1], report.geometry.coordinates[0]];
-          
-          return (
-            <Marker 
-              key={report.id || `rep-${idx}`}
-              position={coords}
-              icon={getMarkerIcon(db)}
-            >
-              <Popup>
-                <div className="text-sm p-1">
-                  <div className="font-bold border-b mb-1 pb-1 text-gray-800">
-                    Επίπεδο Θορύβου: {db} dB
-                  </div>
-                  <div className="text-gray-600">
-                    <span className="font-semibold">Πηγή:</span> {report.properties.noise_source}
-                  </div>
-                  <div className="text-gray-500 text-xs mt-1 italic">
-                    {new Date(report.properties.rec_time).toLocaleString('el-GR')}
-                  </div>
-                </div>
-              </Popup>
-            </Marker>
-          );
-        })}
+        {/* Προβολή Σημείων με Ομαδοποίηση (Clustering) */}
+        {mode === 'points' && (
+          <MarkerClusterGroup chunkedLoading>
+            {reports.map((report, idx) => {
+              const db = parseFloat(report.properties.noise_db_val);
+              const coords = [report.geometry.coordinates[1], report.geometry.coordinates[0]];
+              
+              return (
+                <Marker 
+                  key={report.id || `rep-${idx}`}
+                  position={coords}
+                  icon={getMarkerIcon(db)}
+                >
+                  <Popup>
+                    <div className="p-1 min-w-[150px]">
+                      <h4 className="font-bold text-gray-800 border-b pb-1 mb-1">Στάθμη: {db} dB</h4>
+                      <p className="text-xs text-gray-600">Πηγή: {report.properties.noise_source}</p>
+                      <p className="text-xs text-gray-500 mt-1 italic">
+                        {new Date(report.properties.rec_time).toLocaleString('el-GR')}
+                      </p>
+                    </div>
+                  </Popup>
+                </Marker>
+              );
+            })}
+          </MarkerClusterGroup>
+        )}
 
-        {/* Προβολή Χάρτη Θερμότητας */}
+        {/* Προβολή Heatmap */}
         {mode === 'heatmap' && (
-          <SimpleHeatmapLayer points={reports} />
+          <HeatmapLayer points={reports} />
         )}
       </MapContainer>
     </div>
