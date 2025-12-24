@@ -140,7 +140,7 @@ export function AnalysisMap({ reports = [], mode = 'points' }) {
                                 <div className="text-sm space-y-2 text-gray-700">
                                   <p>🕒 {new Date(props.rec_time).toLocaleString('el-GR')}</p>
                                   <p>📢 {getSourceLabel(props.noise_source)}</p>
-                                  <p>😠 Ενόχληση: <strong>{props.annoyance_level || '-'}</strong>/10</p>
+                                  <p>🔉 Υπ. Ενόχληση: <strong>{props.annoyance_level || '-'}</strong>/5</p>
                                 </div>
                               </div>
                             </Popup>
