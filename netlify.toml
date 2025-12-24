@@ -16,4 +16,25 @@
 [[redirects]]
   from = "/*"
   to = "/index.html"
+# Ρυθμίσεις Build
+[build]
+  # Ορίζουμε ότι το frontend βρίσκεται στον φάκελο 'frontend'
+  base = "frontend"
+  
+  # Ο φάκελος που περιέχει τα έτοιμα αρχεία μετά το build
+  publish = "build"
+  
+  # Η εντολή για να χτιστεί το React app
+  command = "npm run build"
+
+[build.environment]
+  # ΚΡΙΣΙΜΟ: Ορίζουμε την έκδοση Node.js σε 18 (LTS) για μέγιστη συμβατότητα
+  NODE_VERSION = "18"
+  # Εξασφαλίζουμε ότι θα αγνοηθούν τα peer dependency conflicts (αντικαθιστά το .npmrc)
+  NPM_FLAGS = "--legacy-peer-deps"
+
+# Ρυθμίσεις Redirects (Απαραίτητο για React Router)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
   status = 200
