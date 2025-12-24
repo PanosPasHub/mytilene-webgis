@@ -4,24 +4,6 @@
   base = "frontend"
   
   # Ο φάκελος που περιέχει τα έτοιμα αρχεία μετά το build
-  # (Σχετικό με το base, άρα εννοεί frontend/build)
-  publish = "build"
-  
-  # Η εντολή για να χτιστεί το React app
-  command = "npm run build"
-
-# Ρυθμίσεις Redirects (Απαραίτητο για React Router)
-# Αυτό λέει στο Netlify να στέλνει όλα τα αιτήματα στο index.html
-# ώστε να διαχειρίζεται το routing η React εφαρμογή.
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-# Ρυθμίσεις Build
-[build]
-  # Ορίζουμε ότι το frontend βρίσκεται στον φάκελο 'frontend'
-  base = "frontend"
-  
-  # Ο φάκελος που περιέχει τα έτοιμα αρχεία μετά το build
   publish = "build"
   
   # Η εντολή για να χτιστεί το React app
@@ -30,7 +12,7 @@
 [build.environment]
   # ΚΡΙΣΙΜΟ: Ορίζουμε την έκδοση Node.js σε 18 (LTS) για μέγιστη συμβατότητα
   NODE_VERSION = "18"
-  # Εξασφαλίζουμε ότι θα αγνοηθούν τα peer dependency conflicts (αντικαθιστά το .npmrc)
+  # Εξασφαλίζουμε ότι θα αγνοηθούν τα peer dependency conflicts
   NPM_FLAGS = "--legacy-peer-deps"
 
 # Ρυθμίσεις Redirects (Απαραίτητο για React Router)
