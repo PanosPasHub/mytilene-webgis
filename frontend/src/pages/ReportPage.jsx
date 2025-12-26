@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { HeroSlider } from "../components/HeroSlider";
 import { Footer } from "../components/Footer";
 import { NoiseRecorder } from "../components/NoiseRecorder"; 
+import { DeviceCalibration } from "../components/DeviceCalibration"; 
 import { Info, AlertCircle, CheckCircle } from 'lucide-react'; 
 import { environmentalAPI } from '../services/api'; 
 
@@ -10,6 +11,9 @@ export default function ReportPage() {
   const [annoyanceLevel, setAnnoyanceLevel] = useState('');
   const [noiseSource, setNoiseSource] = useState('');
   
+  // State για το Calibration Modal
+  const [showCalibration, setShowCalibration] = useState(false);
+
   // State για τη διαχείριση UI (Loading/Success/Error)
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
@@ -34,7 +38,7 @@ export default function ReportPage() {
     { value: '5', label: '5 - Ανυπόφορο' }
   ];
 
-  // --- Helper: Λήψη GPS (Βελτιωμένη) ---
+  // --- Helper: Λήψη GPS ---
   const getGeolocation = () => {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
@@ -47,8 +51,7 @@ export default function ReportPage() {
       };
 
       const error = (err) => {
-        // Αν αποτύχει η υψηλή ακρίβεια (timeout), δοκιμάζουμε με χαμηλότερη
-        if (err.code === 3) { // Timeout
+        if (err.code === 3) { // Timeout logic
             console.warn("High accuracy GPS timed out, trying low accuracy...");
             navigator.geolocation.getCurrentPosition(
                 success,
@@ -60,7 +63,6 @@ export default function ReportPage() {
         }
       };
 
-      // Πρώτη προσπάθεια: Υψηλή Ακρίβεια, Timeout 10 δευτερόλεπτα
       navigator.geolocation.getCurrentPosition(success, error, { 
           enableHighAccuracy: true, 
           timeout: 10000, 
@@ -75,10 +77,8 @@ export default function ReportPage() {
     setErrorMessage(null);
 
     try {
-      // 1. Λήψη τοποθεσίας (GPS)
       const location = await getGeolocation();
 
-      // 2. Ετοιμασία δεδομένων (DTO)
       const reportData = {
         noise_db_val: avgDb,
         noise_source: noiseSource,
@@ -87,33 +87,28 @@ export default function ReportPage() {
         longitude: location.lng,
       };
 
-      // 3. Αποστολή στο API μέσω του Service (api.js)
-      // Εδώ καλούμε τη μέθοδο που φτιάξαμε στο services/api.js
-      await environmentalAPI.submitNoiseReport(reportData);
+      // --- ΔΙΟΡΘΩΣΗ ΕΔΩ ---
+      // Παλιά: await environmentalAPI.submitReading(avgDb);
+      // Νέα (Σωστή):
+      await environmentalAPI.submitReading(reportData); 
 
-      // 4. Επιτυχία
       setSubmitSuccess(true);
       resetForm();
 
     } catch (error) {
-  console.error("Submission Error:", error);
+      console.error("Submission Error:", error);
+      let msg = error.message;
 
-  // 1. Ξεκινάμε με το πραγματικό μήνυμα που ήρθε από το api.js
-  // (π.χ. "Η καταγραφή βρίσκεται εκτός της περιοχής της Μυτιλήνης.")
-  let msg = error.message;
+      if (error.code === 1) msg = "Η πρόσβαση στην τοποθεσία απορρίφθηκε. Παρακαλώ ενεργοποιήστε το GPS.";
+      else if (error.code === 2) msg = "Η τοποθεσία δεν είναι διαθέσιμη.";
+      else if (error.code === 3) msg = "Η λήψη τοποθεσίας καθυστερεί πολύ. Μετακινηθείτε σε ανοιχτό χώρο.";
+      
+      if (!msg || msg === "Failed to fetch") {
+          msg = "Δυστυχώς προέκυψε σφάλμα επικοινωνίας.";
+      }
 
-  // 2. Ελέγχουμε τους κωδικούς σφάλματος του GPS (GeolocationPositionError)
-  if (error.code === 1) msg = "Η πρόσβαση στην τοποθεσία απορρίφθηκε. Παρακαλώ ενεργοποιήστε το GPS.";
-  else if (error.code === 2) msg = "Η τοποθεσία δεν είναι διαθέσιμη.";
-  else if (error.code === 3) msg = "Η λήψη τοποθεσίας καθυστερεί πολύ. Μετακινηθείτε σε ανοιχτό χώρο.";
-  
-  // 3. Fallback: Αν για κάποιο λόγο το msg είναι κενό ή πολύ τεχνικό, βάζουμε το γενικό
-  if (!msg || msg === "Failed to fetch") {
-      msg = "Δυστυχώς προέκυψε σφάλμα επικοινωνίας.";
-  }
-
-  setErrorMessage(msg);
-}finally {
+      setErrorMessage(msg);
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -148,12 +143,13 @@ export default function ReportPage() {
                 <h3 className="font-bold text-blue-800 text-lg">Οδηγίες Καταγραφής</h3>
               </div>
               <ul className="space-y-3 text-gray-700 text-sm leading-relaxed list-disc pl-5">
+                <li className="font-bold text-cyan-800 bg-cyan-100 p-1 rounded">
+                  ⚠️ ΠΡΩΤΟ ΒΗΜΑ: Πριν την πρώτη σας εγγραφή, πατήστε το γρανάζι "Ρυθμίσεις" (κάτω από το κουμπί εγγραφής) για να καλιμπράρετε τη συσκευή σας.
+                </li>
                 <li>Βοηθήστε μας να καταγράψουμε τον <strong>φυσικό θόρυβο</strong> σε κάθε γειτονιά της πόλης.</li>
                 <li>Η καταγραφή πρέπει να γίνεται κατά κύριο λόγο μέσω κινητού σε <strong>εξωτερικό χώρο</strong>.</li>
                 <li>Βεβαιωθείτε ότι έχετε <strong>ανοιχτή την τοποθεσία (GPS)</strong> της συσκευής σας.</li>
                 <li>Καλό είναι να <strong>μην γίνεται καταγραφή</strong> όταν συμβαίνει κάποιο ξαφνικό γεγονός (π.χ. κορνάρισμα, βεγγαλικά, συναυλία).</li>
-                <li>Το μικρόφωνο <strong>δεν πρέπει να καλύπτεται</strong> από θήκη ή από τα χέρια σας.</li>
-                <li>Αποφύγετε την καταγραφή όταν το κινητό είναι εκτεθειμένο σε <strong>έντονο αέρα</strong>.</li>
               </ul>
             </div>
 
@@ -201,6 +197,10 @@ export default function ReportPage() {
               isReady={annoyanceLevel !== '' && noiseSource !== ''}
               onRecordingComplete={handleRecordingComplete}
               onError={(msg) => setErrorMessage(msg)}
+              onOpenCalibration={() => {
+                console.log("Calibration button clicked"); // Debug log
+                setShowCalibration(true);
+              }} 
             />
 
           </div>
@@ -210,6 +210,15 @@ export default function ReportPage() {
       <Footer />
 
       {/* --- Modals / Overlays --- */}
+      
+      {showCalibration && (
+        <DeviceCalibration 
+          onClose={() => setShowCalibration(false)}
+          onSave={(val) => {
+            console.log("New offset saved:", val);
+          }}
+        />
+      )}
 
       {/* Loading Overlay */}
       {isSubmitting && (

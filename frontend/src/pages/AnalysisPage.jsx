@@ -110,7 +110,7 @@ export default function AnalysisPage() {
   const formatDate = (timestamp) => {
     if (!timestamp) return '-';
     return new Date(timestamp).toLocaleDateString('el-GR', {
-        day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+      day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
     });
   };
 
@@ -262,21 +262,33 @@ export default function AnalysisPage() {
                   </select>
                 </div>
 
-                {/* Legend */}
+                {/* Legend (ΕΝΗΜΕΡΩΜΕΝΟ ΜΕ ΣΩΣΤΑ ΧΡΩΜΑΤΑ) */}
                 {visualizationMode === 'points' ? (
                   <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                     <h4 className="text-xs font-bold text-gray-500 uppercase mb-3 tracking-wider">Επίπεδα (dB)</h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-green-500 mr-2"></span> &lt; 50 dB (Χαμηλός)</div>
-                      <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-yellow-400 mr-2"></span> 50-65 dB (Μέτριος)</div>
-                      <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-orange-500 mr-2"></span> 65-80 dB (Υψηλός)</div>
-                      <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-red-600 mr-2"></span> &gt; 80 dB (Επικίνδυνος)</div>
+                    <div className="space-y-1.5 text-xs font-medium text-gray-600">
+                      <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-emerald-700 mr-2"></span> &lt; 40 dB</div>
+                      <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-emerald-500 mr-2"></span> 41-45 dB</div>
+                      <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-green-500 mr-2"></span> 46-50 dB</div>
+                      <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-lime-500 mr-2"></span> 51-55 dB</div>
+                      <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-yellow-400 mr-2"></span> 56-60 dB</div>
+                      <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-yellow-600 mr-2"></span> 61-65 dB</div>
+                      <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-orange-400 mr-2"></span> 66-70 dB</div>
+                      <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-orange-600 mr-2"></span> 71-75 dB</div>
+                      <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-red-600 mr-2"></span> 76-80 dB</div>
+                      <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-red-900 mr-2"></span> &gt; 80 dB</div>
                     </div>
                   </div>
                 ) : (
                   <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                     <h4 className="text-xs font-bold text-gray-500 uppercase mb-3 tracking-wider">Ένταση Heatmap</h4>
-                    <div className="h-4 w-full rounded bg-gradient-to-r from-blue-500 via-green-400 to-red-600"></div>
+                    {/* Linear Gradient με τα ίδια χρώματα: Emerald -> Green -> Lime -> Yellow -> Orange -> Red */}
+                    <div 
+                      className="h-4 w-full rounded"
+                      style={{
+                        background: 'linear-gradient(to right, #047857, #10b981, #22c55e, #84cc16, #facc15, #ca8a04, #fb923c, #ea580c, #dc2626, #7f1d1d)'
+                      }}
+                    ></div>
                     <div className="flex justify-between text-xs text-gray-500 mt-1">
                       <span>Χαμηλή</span>
                       <span>Υψηλή</span>
