@@ -87,9 +87,6 @@ export default function ReportPage() {
         longitude: location.lng,
       };
 
-      // --- ΔΙΟΡΘΩΣΗ ΕΔΩ ---
-      // Παλιά: await environmentalAPI.submitReading(avgDb);
-      // Νέα (Σωστή):
       await environmentalAPI.submitReading(reportData); 
 
       setSubmitSuccess(true);

@@ -8,18 +8,37 @@ export const NoiseRecorder = ({ isReady, onRecordingComplete, onError, onOpenCal
 
   const audioContextRef = useRef(null);
   const streamRef = useRef(null);
-  const intervalRef = useRef(null);
+  const scriptProcessorRef = useRef(null);
+  const sourceRef = useRef(null);
+  
+  const dbReadingsRef = useRef([]);
+  const startTimeRef = useRef(null);
+  const intervalRef = useRef(null); 
+  
+  // Ref για το smoothing (κρατάμε την προηγούμενη τιμή)
+  const previousDbRef = useRef(40); 
 
   useEffect(() => {
     return () => stopResources();
   }, []);
 
   const stopResources = () => {
+    if (scriptProcessorRef.current) {
+        scriptProcessorRef.current.disconnect();
+        scriptProcessorRef.current.onaudioprocess = null;
+        scriptProcessorRef.current = null;
+    }
+    if (sourceRef.current) {
+        sourceRef.current.disconnect();
+        sourceRef.current = null;
+    }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
     }
-    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-      audioContextRef.current.close();
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(console.error);
+      audioContextRef.current = null;
     }
     if (intervalRef.current) clearInterval(intervalRef.current);
   };
@@ -27,87 +46,122 @@ export const NoiseRecorder = ({ isReady, onRecordingComplete, onError, onOpenCal
   const startRecording = async () => {
     if (!isReady) return;
 
-    // --- ΚΡΙΣΙΜΟ: Διάβασμα του Offset εδώ ---
-    // Έτσι εξασφαλίζουμε ότι θα πάρει την τελευταία τιμή που έσωσε ο χρήστης στο DeviceCalibration
-    const storedOffset = parseInt(localStorage.getItem('mic_calibration_offset')) || 90;
+    // ΑΛΛΑΓΗ 1: Default Offset στο 100
+    const storedOffset = parseInt(localStorage.getItem('mic_calibration_offset')) || 100;
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      const constraints = {
         audio: {
           echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false 
-        } 
-      });
-      
+          autoGainControl: false,
+          noiseSuppression: false, // Σημαντικό για να μετράει περιβαλλοντικό θόρυβο
+          channelCount: 1
+        }
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
 
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       const audioContext = new AudioContextClass();
       audioContextRef.current = audioContext;
-      const source = audioContext.createMediaStreamSource(stream);
-      const analyser = audioContext.createAnalyser();
-      analyser.fftSize = 2048;
-      source.connect(analyser);
 
-      const bufferLength = analyser.frequencyBinCount;
-      const dataArray = new Uint8Array(bufferLength);
+      // Χρήση buffer 4096 για λίγο πιο σταθερές μετρήσεις (θυσιάζει ελάχιστη ταχύτητα απόκρισης για ακρίβεια)
+      const scriptProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+      scriptProcessorRef.current = scriptProcessor;
+
+      const source = audioContext.createMediaStreamSource(stream);
+      sourceRef.current = source;
+
+      const gainNode = audioContext.createGain();
+      gainNode.gain.value = 0; 
+
+      source.connect(scriptProcessor);
+      scriptProcessor.connect(gainNode);
+      gainNode.connect(audioContext.destination);
 
       setIsRecording(true);
       setProgress(0);
-      
-      let dbReadings = [];
-      const startTime = Date.now();
-      const DURATION = 10000; // 10 δευτερόλεπτα
+      dbReadingsRef.current = [];
+      previousDbRef.current = 40; // Reset starting smoothing value
+      startTimeRef.current = Date.now();
+      const DURATION = 60000; 
+
+      scriptProcessor.onaudioprocess = (event) => {
+        const inputData = event.inputBuffer.getChannelData(0);
+        
+        let sum = 0;
+        for (let i = 0; i < inputData.length; i++) {
+            sum += inputData[i] * inputData[i];
+        }
+        let rms = Math.sqrt(sum / inputData.length);
+
+        // ΑΛΛΑΓΗ 2: Καθαρά Μαθηματικά χωρίς το * 5.0
+        let rawDb;
+        if (rms > 0) {
+            rawDb = 20 * Math.log10(rms) + storedOffset;
+        } else {
+            rawDb = 10;
+        }
+
+        rawDb = Math.max(10, Math.min(130, rawDb));
+        
+        // ΑΛΛΑΓΗ 3: SMOOTHING (Εξομάλυνση)
+        // Αυτό κάνει την τιμή να μην "χοροπηδάει" σαν τρελή.
+        // Το 0.8 σημαίνει: "Κράτα το 80% της παλιάς τιμής και βάλε το 20% της νέας".
+        const alpha = 0.8;
+        const smoothedDb = (alpha * previousDbRef.current) + ((1 - alpha) * rawDb);
+        previousDbRef.current = smoothedDb;
+
+        const displayDb = Math.round(smoothedDb);
+
+        setInstantDb(displayDb);
+        dbReadingsRef.current.push(displayDb);
+
+        const elapsed = Date.now() - startTimeRef.current;
+        if (elapsed >= DURATION) {
+            scriptProcessor.onaudioprocess = null; 
+            finishRecording();
+        }
+      };
 
       intervalRef.current = setInterval(() => {
-        const elapsed = Date.now() - startTime;
+        const elapsed = Date.now() - startTimeRef.current;
         const currentProgress = Math.min((elapsed / DURATION) * 100, 100);
         setProgress(currentProgress);
-
-        // Υπολογισμός dB
-        analyser.getByteTimeDomainData(dataArray);
-        let sumSq = 0;
-        for (let i = 0; i < bufferLength; i++) {
-          let norm = (dataArray[i] / 128.0) - 1;
-          sumSq += norm * norm;
-        }
-        let rms = Math.sqrt(sumSq / bufferLength);
-        
-        // Χρήση του storedOffset
-        let currentDb = 20 * Math.log10(rms) + storedOffset;
-        
-        // Φιλτράρισμα
-        if (!isFinite(currentDb)) currentDb = 30;
-        currentDb = Math.max(30, currentDb);
-
-        setInstantDb(Math.round(currentDb));
-        dbReadings.push(currentDb);
-
-        if (elapsed >= DURATION) {
-          finishRecording(dbReadings);
-        }
       }, 100);
 
     } catch (err) {
       console.error("Mic Error:", err);
-      if (onError) {
-        onError("Δεν βρέθηκε μικρόφωνο ή δεν δόθηκε άδεια πρόσβασης.");
-      } else {
-        alert("Δεν βρέθηκε μικρόφωνο ή δεν δόθηκε άδεια πρόσβασης.");
-      }
+      const msg = "Δεν βρέθηκε μικρόφωνο ή δεν δόθηκε άδεια.";
+      if (onError) onError(msg);
+      else alert(msg);
       setIsRecording(false);
     }
   };
 
-  const finishRecording = (readings) => {
+  const finishRecording = () => {
     stopResources();
     setIsRecording(false);
     
-    const avg = readings.reduce((a, b) => a + b, 0) / readings.length;
-    onRecordingComplete(Math.round(avg));
+    const readings = dbReadingsRef.current;
+    if (readings.length === 0) {
+        onRecordingComplete(0);
+        return;
+    }
+    
+    // ΑΛΛΑΓΗ 4: Σωστός υπολογισμός μέσου όρου Log-average
+    let sumPower = 0;
+    for (let i = 0; i < readings.length; i++) {
+        sumPower += Math.pow(10, readings[i] / 10);
+    }
+    const avgPower = sumPower / readings.length;
+    const avgDb = 10 * Math.log10(avgPower);
+    
+    onRecordingComplete(Math.round(avgDb));
   };
 
+  // ... (Το υπόλοιπο return UI μένει ίδιο)
   return (
     <div className="w-full mt-6">
       {!isRecording ? (
@@ -122,10 +176,9 @@ export const NoiseRecorder = ({ isReady, onRecordingComplete, onError, onOpenCal
                 }`}
             >
             <Mic className="w-6 h-6" />
-            {isReady ? 'Έναρξη Καταγραφής (10s)' : 'Συμπληρώστε τα στοιχεία'}
+            {isReady ? 'Έναρξη Καταγραφής (1 λεπτό)' : 'Συμπληρώστε τα στοιχεία'}
             </button>
             
-            {/* Κουμπί για άνοιγμα Calibration */}
             <div className="flex justify-center">
                 <button 
                     onClick={onOpenCalibration}
@@ -141,8 +194,10 @@ export const NoiseRecorder = ({ isReady, onRecordingComplete, onError, onOpenCal
           <div className="absolute inset-0 bg-cyan-500/5 animate-pulse"></div>
           
           <div className="relative z-10">
-            <div className="mb-4 font-bold text-cyan-400 text-2xl flex items-center justify-center gap-3">
-              <Activity className="animate-pulse" />
+            <div className={`mb-4 font-bold text-4xl flex items-center justify-center gap-3 transition-colors duration-100 ${
+                instantDb > 80 ? 'text-red-500' : instantDb > 65 ? 'text-orange-400' : 'text-cyan-400'
+            }`}>
+              <Activity className="animate-pulse w-8 h-8" />
               {instantDb} dB
             </div>
             
