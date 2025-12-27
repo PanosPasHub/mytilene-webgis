@@ -100,7 +100,6 @@ export const DeviceCalibration = ({ onClose, onSave }) => {
         }
         let rms = Math.sqrt(sum / inputData.length);
 
-        // ΑΛΛΑΓΗ 2: Αφαίρεση του * 5.0 (ήταν λάθος μαθηματικά)
         // Ο καθαρός τύπος είναι 20*log10(rms) + Offset
         
         let db;

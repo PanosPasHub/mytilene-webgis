@@ -1,12 +1,12 @@
 import React from "react";
-import { HeroSlider } from "../components/HeroSlider";
+import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
 
 export default function ContactPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Hero Slider */}
-      <HeroSlider />
+      <Header />
 
       {/* Κύριο Περιεχόμενο */}
       <div className="py-16">

@@ -85,7 +85,7 @@ export const NoiseRecorder = ({ isReady, onRecordingComplete, onError, onOpenCal
       dbReadingsRef.current = [];
       previousDbRef.current = 40; // Reset starting smoothing value
       startTimeRef.current = Date.now();
-      const DURATION = 60000; 
+      const DURATION = 20000; 
 
       scriptProcessor.onaudioprocess = (event) => {
         const inputData = event.inputBuffer.getChannelData(0);
@@ -176,7 +176,7 @@ export const NoiseRecorder = ({ isReady, onRecordingComplete, onError, onOpenCal
                 }`}
             >
             <Mic className="w-6 h-6" />
-            {isReady ? 'Έναρξη Καταγραφής (1 λεπτό)' : 'Συμπληρώστε τα στοιχεία'}
+            {isReady ? 'Έναρξη Καταγραφής' : 'Συμπληρώστε τα στοιχεία'}
             </button>
             
             <div className="flex justify-center">

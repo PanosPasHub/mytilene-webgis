@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { HeroSlider } from "../components/HeroSlider";
+import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
 import { AnalysisMap } from "../components/AnalysisMap";
 
@@ -130,7 +130,7 @@ export default function AnalysisPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
-      <HeroSlider />
+      <Header />
 
       <main className="flex-grow py-8">
         <div className="max-w-7xl mx-auto px-4">

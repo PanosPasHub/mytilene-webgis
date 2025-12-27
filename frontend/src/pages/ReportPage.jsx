@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { HeroSlider } from "../components/HeroSlider";
+import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
 import { NoiseRecorder } from "../components/NoiseRecorder"; 
 import { DeviceCalibration } from "../components/DeviceCalibration"; 
@@ -117,7 +117,7 @@ export default function ReportPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
-      <HeroSlider />
+      <Header />
 
       <div className="flex-grow py-12 px-4">
         <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
