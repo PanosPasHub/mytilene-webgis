@@ -32,7 +32,7 @@ export function Footer() {
             to="/analysis" 
             className="hover:text-white transition text-sm md:text-base"
           >
-            Αποτέλεσμα Ανάλυσης
+            Ανάλυση
           </Link>
           <Link 
             to="/contact" 
