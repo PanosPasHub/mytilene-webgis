@@ -89,14 +89,13 @@ export const NoiseRecorder = ({ isReady, onRecordingComplete, onError, onOpenCal
 
       scriptProcessor.onaudioprocess = (event) => {
         const inputData = event.inputBuffer.getChannelData(0);
-        
+        // Υπολογισμός RMS (Root Mean Square)
         let sum = 0;
         for (let i = 0; i < inputData.length; i++) {
             sum += inputData[i] * inputData[i];
         }
         let rms = Math.sqrt(sum / inputData.length);
-
-        // ΑΛΛΑΓΗ 2: Καθαρά Μαθηματικά χωρίς το * 5.0
+        // Μετατροπή σε dB με Offset
         let rawDb;
         if (rms > 0) {
             rawDb = 20 * Math.log10(rms) + storedOffset;
@@ -106,9 +105,7 @@ export const NoiseRecorder = ({ isReady, onRecordingComplete, onError, onOpenCal
 
         rawDb = Math.max(10, Math.min(130, rawDb));
         
-        // ΑΛΛΑΓΗ 3: SMOOTHING (Εξομάλυνση)
-        // Αυτό κάνει την τιμή να μην "χοροπηδάει" σαν τρελή.
-        // Το 0.8 σημαίνει: "Κράτα το 80% της παλιάς τιμής και βάλε το 20% της νέας".
+        // Εξομάλυνση (Smoothing)
         const alpha = 0.8;
         const smoothedDb = (alpha * previousDbRef.current) + ((1 - alpha) * rawDb);
         previousDbRef.current = smoothedDb;

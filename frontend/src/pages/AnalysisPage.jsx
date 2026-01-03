@@ -13,9 +13,9 @@ export default function AnalysisPage() {
   
   // --- Filters States ---
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [timeOfDayFilter, setTimeOfDayFilter] = useState('all'); // Φίλτρο ώρας ημέρας
+  const [timeOfDayFilter, setTimeOfDayFilter] = useState('all');
   
-  // Visualization State
+  // Visualization State: 'points', 'heatmap' (density), 'idw' (interpolation)
   const [visualizationMode, setVisualizationMode] = useState('points');
 
   // Timeline States
@@ -53,7 +53,7 @@ export default function AnalysisPage() {
     fetchData();
   }, []);
 
-  // 2. Filter Logic (Ενημερωμένη με ξεχωριστές ώρες)
+  // 2. Filter Logic
   const filteredData = useMemo(() => {
     return allData.filter(feature => {
       const props = feature.properties;
@@ -70,36 +70,17 @@ export default function AnalysisPage() {
         passCategory = props.noise_source === categoryFilter;
       }
 
-      // Γ. Φίλτρο Ώρας Ημέρας (Νέα Λογική: Ξεχωριστές Ζώνες)
+      // Γ. Φίλτρο Ώρας Ημέρας
       let passTimeOfDay = true;
       if (timeOfDayFilter !== 'all') {
         switch (timeOfDayFilter) {
-            // --- Ώρες Αιχμής ---
-            case 'peak_morning': // 08:00 - 10:00
-                passTimeOfDay = hour >= 8 && hour < 10;
-                break;
-            case 'peak_noon':    // 13:00 - 15:00
-                passTimeOfDay = hour >= 13 && hour < 15;
-                break;
-            case 'peak_evening': // 19:00 - 22:00
-                passTimeOfDay = hour >= 19 && hour < 22;
-                break;
-            
-            // --- Ενδιάμεσες Ώρες ---
-            case 'inter_morning':   // 10:00 - 13:00
-                passTimeOfDay = hour >= 10 && hour < 13;
-                break;
-            case 'inter_afternoon': // 15:00 - 19:00
-                passTimeOfDay = hour >= 15 && hour < 19;
-                break;
-            
-            // --- Νύχτα / Υπόλοιπο ---
-            case 'night': // 22:00 - 08:00
-                passTimeOfDay = hour >= 22 || hour < 8;
-                break;
-                
-            default:
-                passTimeOfDay = true;
+            case 'peak_morning': passTimeOfDay = hour >= 8 && hour < 10; break;
+            case 'peak_noon':    passTimeOfDay = hour >= 13 && hour < 15; break;
+            case 'peak_evening': passTimeOfDay = hour >= 19 && hour < 22; break;
+            case 'inter_morning':   passTimeOfDay = hour >= 10 && hour < 13; break;
+            case 'inter_afternoon': passTimeOfDay = hour >= 15 && hour < 19; break;
+            case 'night': passTimeOfDay = hour >= 22 || hour < 8; break;
+            default: passTimeOfDay = true;
         }
       }
 
@@ -142,159 +123,168 @@ export default function AnalysisPage() {
 
           <div className="grid lg:grid-cols-4 gap-6">
             
-            {/* Sidebar */}
+            {/* Sidebar Filters */}
             <div className="lg:col-span-1 space-y-6">
               <div className="bg-white rounded-xl shadow-md p-6 sticky top-6 border border-gray-100">
                 <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center border-b pb-3">
                   <span className="mr-2 text-xl">🔍</span> Φίλτρα & Προβολή
                 </h3>
 
-                {/* 1. VISUALIZATION MODE */}
+                {/* 1. VISUALIZATION MODE BUTTONS */}
                 <div className="mb-6">
                   <label className="block text-sm font-bold text-gray-700 mb-2">
                     🗺️ Τρόπος Προβολής
                   </label>
-                  <div className="flex bg-gray-100 p-1 rounded-lg">
+                  <div className="flex flex-col gap-2">
+                    {/* Button: Points */}
                     <button
                       onClick={() => setVisualizationMode('points')}
-                      className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
-                        visualizationMode === 'points' 
-                          ? 'bg-white text-cyan-700 shadow-sm border border-gray-200' 
-                          : 'text-gray-500 hover:text-gray-700'
-                      }`}
+                      className={`w-full py-2 px-3 text-sm font-medium rounded-md transition-all flex items-center justify-center gap-2
+                        ${visualizationMode === 'points' 
+                          ? 'bg-cyan-50 text-cyan-700 border border-cyan-200 shadow-sm ring-1 ring-cyan-200' 
+                          : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-100'}`}
                     >
-                      📍 Σημεία
+                      📍 Σημεία (Ακριβή)
                     </button>
+
+                    {/* Button: Heatmap (Density) */}
                     <button
                       onClick={() => setVisualizationMode('heatmap')}
-                      className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
-                        visualizationMode === 'heatmap' 
-                          ? 'bg-white text-orange-600 shadow-sm border border-gray-200' 
-                          : 'text-gray-500 hover:text-gray-700'
-                      }`}
+                      className={`w-full py-2 px-3 text-sm font-medium rounded-md transition-all flex items-center justify-center gap-2
+                        ${visualizationMode === 'heatmap' 
+                          ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-sm ring-1 ring-blue-200' 
+                          : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-100'}`}
                     >
-                      🔥 Heatmap
+                      🔥 Heatmap (Πυκνότητα)
+                    </button>
+
+                    {/* Button: IDW (Interpolation) */}
+                    <button
+                      onClick={() => setVisualizationMode('idw')}
+                      className={`w-full py-2 px-3 text-sm font-medium rounded-md transition-all flex items-center justify-center gap-2
+                        ${visualizationMode === 'idw' 
+                          ? 'bg-orange-50 text-orange-700 border border-orange-200 shadow-sm ring-1 ring-orange-200' 
+                          : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-100'}`}
+                    >
+                      🌡️ IDW (Ένταση dB)
                     </button>
                   </div>
                 </div>
                 
-                {/* 2. TIME OF DAY FILTER (Detailed) */}
-                <div className="mb-6">
-                  <label className="block text-sm font-bold text-gray-700 mb-2">
-                    ☀️ Ώρα της Ημέρας
-                  </label>
-                  <select
-                      value={timeOfDayFilter}
-                      onChange={(e) => setTimeOfDayFilter(e.target.value)}
-                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none cursor-pointer"
-                  >
-                      <option value="all">🕒 Όλη την ημέρα</option>
-                      
-                      <option disabled className="bg-gray-100 font-bold text-gray-500">--- Ώρες Αιχμής ---</option>
-                      <option value="peak_morning">🚨 Αιχμή Πρωί (08:00 - 10:00)</option>
-                      <option value="peak_noon">🚨 Αιχμή Μεσημέρι (13:00 - 15:00)</option>
-                      <option value="peak_evening">🚨 Αιχμή Βράδυ (19:00 - 22:00)</option>
-                      
-                      <option disabled className="bg-gray-100 font-bold text-gray-500">--- Ενδιάμεσες Ώρες ---</option>
-                      <option value="inter_morning">⏳ Ενδιάμεσο Πρωί (10:00 - 13:00)</option>
-                      <option value="inter_afternoon">⏳ Ενδιάμεσο Απόγευμα (15:00 - 19:00)</option>
-                      
-                      <option disabled className="bg-gray-100 font-bold text-gray-500">--- Υπόλοιπο ---</option>
-                      <option value="night">🌙 Νύχτα / Νωρίς (22:00 - 08:00)</option>
-                  </select>
-                </div>
-
-                {/* 3. RANGE SLIDERS */}
-                <div className="mb-6">
-                  <label className="block text-sm font-bold text-gray-700 mb-2">
-                    📅 Ημερομηνία (Από - Έως)
-                  </label>
-                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-4">
+                {/* 2. FILTERS */}
+                <div className="space-y-4 mb-6">
                     <div>
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-xs font-bold text-cyan-700 uppercase">Απο</span>
-                        <span className="text-xs font-medium text-gray-600">{formatDate(selectedRange.start)}</span>
-                      </div>
-                      <input 
-                          type="range"
-                          min={dateBounds.min}
-                          max={dateBounds.max}
-                          value={selectedRange.start}
-                          onChange={handleStartChange}
-                          className="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-cyan-600"
-                      />
+                        <label className="block text-sm font-bold text-gray-700 mb-1">Πηγή Θορύβου</label>
+                        <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="w-full p-2 bg-gray-50 border rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+                            <option value="all">Όλες οι πηγές</option>
+                            <option value="traffic">Οδική Κυκλοφορία</option>
+                            <option value="construction">Εργοτάξιο / Κατασκευές</option>
+                            <option value="music">Έντονη Μουσική</option>
+                            <option value="human">Ανθρώπινη Ομιλία</option>
+                            <option value="nature">Φυσικό Περιβάλλον</option>
+                            <option value="industrial">Βιομηχανικός Θόρυβος</option>
+                            <option value="other">Άλλο</option>
+                        </select>
                     </div>
                     <div>
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-xs font-bold text-cyan-700 uppercase">Εως</span>
-                        <span className="text-xs font-medium text-gray-600">{formatDate(selectedRange.end)}</span>
-                      </div>
-                      <input 
-                          type="range"
-                          min={dateBounds.min}
-                          max={dateBounds.max}
-                          value={selectedRange.end}
-                          onChange={handleEndChange}
-                          className="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-cyan-600"
-                      />
+                        <label className="block text-sm font-bold text-gray-700 mb-1">Ώρα Ημέρας</label>
+                        <select value={timeOfDayFilter} onChange={(e) => setTimeOfDayFilter(e.target.value)} className="w-full p-2 bg-gray-50 border rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+                            <option value="all">🕒 Όλη την ημέρα</option>
+                            <option disabled>--- Ώρες Αιχμής ---</option>
+                            <option value="peak_morning">🚨 Αιχμή Πρωί (08-10)</option>
+                            <option value="peak_noon">🚨 Αιχμή Μεσημέρι (13-15)</option>
+                            <option value="peak_evening">🚨 Αιχμή Βράδυ (19-22)</option>
+                            <option disabled>--- Άλλες ---</option>
+                            <option value="inter_morning">⏳ Πρωί (10-13)</option>
+                            <option value="inter_afternoon">⏳ Απόγευμα (15-19)</option>
+                            <option value="night">🌙 Νύχτα (22-08)</option>
+                        </select>
                     </div>
-                  </div>
                 </div>
 
-                {/* 4. CATEGORY FILTER */}
-                <div className="mb-6">
+                {/* 3. TIMELINE */}
+                <div className="mb-6 pt-4 border-t border-gray-100">
                   <label className="block text-sm font-bold text-gray-700 mb-2">
-                    📢 Πηγή Θορύβου
+                    📅 Χρονικό Εύρος
                   </label>
-                  <select
-                      value={categoryFilter}
-                      onChange={(e) => setCategoryFilter(e.target.value)}
-                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none cursor-pointer"
-                  >
-                      <option value="all">Όλες οι πηγές</option>
-                      <option value="nature">Φυσικό Περιβάλλον</option>
-                      <option value="traffic">Οδική Κυκλοφορία</option>
-                      <option value="construction">Εργοτάξιο / Κατασκευές</option>
-                      <option value="music">Έντονη Μουσική</option>
-                      <option value="human">Ανθρώπινη Ομιλία</option>
-                      <option value="industrial">Βιομηχανικός Θόρυβος</option>
-                      <option value="other">Άλλο</option>
-                  </select>
+                  <div className="space-y-4">
+                    <div>
+                        <div className="flex justify-between text-xs text-gray-500 mb-1">
+                            <span>Από</span>
+                            <span className="font-medium">{formatDate(selectedRange.start)}</span>
+                        </div>
+                        <input type="range" min={dateBounds.min} max={dateBounds.max} value={selectedRange.start} onChange={handleStartChange} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-cyan-600" />
+                    </div>
+                    <div>
+                        <div className="flex justify-between text-xs text-gray-500 mb-1">
+                            <span>Έως</span>
+                            <span className="font-medium">{formatDate(selectedRange.end)}</span>
+                        </div>
+                        <input type="range" min={dateBounds.min} max={dateBounds.max} value={selectedRange.end} onChange={handleEndChange} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-cyan-600" />
+                    </div>
+                  </div>
                 </div>
 
-                {/* Legend (ΕΝΗΜΕΡΩΜΕΝΟ ΜΕ ΣΩΣΤΑ ΧΡΩΜΑΤΑ) */}
-                {visualizationMode === 'points' ? (
-                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                    <h4 className="text-xs font-bold text-gray-500 uppercase mb-3 tracking-wider">Επίπεδα (dB)</h4>
-                    <div className="space-y-1.5 text-xs font-medium text-gray-600">
-                      <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-emerald-700 mr-2"></span> &lt; 40 dB</div>
-                      <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-emerald-500 mr-2"></span> 41-45 dB</div>
-                      <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-green-500 mr-2"></span> 46-50 dB</div>
-                      <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-lime-500 mr-2"></span> 51-55 dB</div>
-                      <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-yellow-400 mr-2"></span> 56-60 dB</div>
-                      <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-yellow-600 mr-2"></span> 61-65 dB</div>
-                      <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-orange-400 mr-2"></span> 66-70 dB</div>
-                      <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-orange-600 mr-2"></span> 71-75 dB</div>
-                      <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-red-600 mr-2"></span> 76-80 dB</div>
-                      <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-red-900 mr-2"></span> &gt; 80 dB</div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                    <h4 className="text-xs font-bold text-gray-500 uppercase mb-3 tracking-wider">Ένταση Heatmap</h4>
-                    {/* Linear Gradient με τα ίδια χρώματα: Emerald -> Green -> Lime -> Yellow -> Orange -> Red */}
-                    <div 
-                      className="h-4 w-full rounded"
-                      style={{
-                        background: 'linear-gradient(to right, #047857, #10b981, #22c55e, #84cc16, #facc15, #ca8a04, #fb923c, #ea580c, #dc2626, #7f1d1d)'
-                      }}
-                    ></div>
-                    <div className="flex justify-between text-xs text-gray-500 mt-1">
-                      <span>Χαμηλή</span>
-                      <span>Υψηλή</span>
-                    </div>
-                  </div>
-                )}
+                {/* 4. LEGEND (Δυναμικό ανάλογα με το Mode) */}
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    {/* Τίτλος Legend */}
+                    <h4 className="text-xs font-bold text-gray-500 uppercase mb-3 tracking-wider">
+                        {visualizationMode === 'heatmap' ? 'Πυκνοτητα Καταγραφων' : 'Ενταση Θορυβου (dB)'}
+                    </h4>
+
+                    {/* A. LEGEND ΓΙΑ POINTS */}
+                    {visualizationMode === 'points' && (
+                        <div className="space-y-1.5 text-xs font-medium text-gray-600">
+                            <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#047857] mr-2"></span> &lt; 40 dB (Πολύ Χαμηλό)</div>
+                            <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#10b981] mr-2"></span> 41-45 dB</div>
+                            <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#22c55e] mr-2"></span> 46-50 dB</div>
+                            <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#84cc16] mr-2"></span> 51-55 dB</div>
+                            <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#facc15] mr-2"></span> 56-60 dB</div>
+                            <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#fab115] mr-2"></span> 61-65 dB</div>
+                            <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#fb923c] mr-2"></span> 66-70 dB</div>
+                            <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#ea580c] mr-2"></span> 71-75 dB</div>
+                            <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#dc2626] mr-2"></span> 76-80 dB</div>
+                            <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#7f1d1d] mr-2"></span> &gt; 80 dB (Επικίνδυνο)</div>
+                        </div>
+                    )}
+
+                    {/* B. LEGEND ΓΙΑ IDW (GRADIENT) */}
+                    {visualizationMode === 'idw' && (
+                        <div>
+                            {/* Gradient Bar: Green -> Yellow -> Red */}
+                            <div className="w-full h-4 rounded mb-1" style={{
+                                background: 'linear-gradient(to right, #047857, #10b981, #22c55e, #facc15, #fb923c, #dc2626, #7f1d1d)'
+                            }}></div>
+                            <div className="flex justify-between text-xs text-gray-500 font-medium">
+                                <span>30dB</span>
+                                <span>65dB</span>
+                                <span>100dB</span>
+                            </div>
+                            <p className="text-[10px] text-gray-400 mt-2 italic text-center">
+                                *Υπολογισμός μέσου όρου με χωρική παρεμβολή (IDW)
+                            </p>
+                        </div>
+                    )}
+
+                    {/* C. LEGEND ΓΙΑ DENSITY HEATMAP */}
+                    {visualizationMode === 'heatmap' && (
+                        <div>
+                            {/* Gradient Bar: Blue -> Lime -> Red */}
+                            <div className="w-full h-4 rounded mb-1" style={{
+                                background: 'linear-gradient(to right, blue, lime, red)'
+                            }}></div>
+                            <div className="flex justify-between text-xs text-gray-500 font-medium">
+                                <span>Αραιή</span>
+                                <span>Μέτρια</span>
+                                <span>Πυκνή</span>
+                            </div>
+                            <p className="text-[10px] text-gray-400 mt-2 italic text-center">
+                                *Δείχνει τη συχνότητα/πυκνότητα των μετρήσεων
+                            </p>
+                        </div>
+                    )}
+                </div>
+
               </div>
             </div>
 

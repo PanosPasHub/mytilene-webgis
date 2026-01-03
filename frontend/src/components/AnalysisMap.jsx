@@ -2,9 +2,13 @@ import React, { useEffect } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Popup, LayersControl, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import 'leaflet.heat'; // Απαιτεί npm install leaflet.heat
+import 'leaflet.heat'; // Απαραίτητο: npm install leaflet.heat
+import { setupIDW } from '../utils/leaflet-idw'; // Import τον αλγόριθμο Raster IDW
 
-// Fix για τα εικονίδια του Leaflet που χάνονται στο React
+// Αρχικοποίηση του IDW plugin
+setupIDW();
+
+// Fix για τα εικονίδια του Leaflet
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
@@ -12,82 +16,116 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-// --- HEATMAP LAYER COMPONENT ---
-const HeatmapLayer = ({ points }) => {
+// --- COMPONENT: IDW LAYER (RASTER / INTENSITY) ---
+const IDWLayer = ({ points }) => {
   const map = useMap(); 
-
+  
   useEffect(() => {
+    // Βεβαιωνόμαστε ότι το plugin έχει φορτωθεί
+    setupIDW();
+
     if (!points || points.length === 0) return;
 
-    // Μετατροπή δεδομένων: [lat, lon, intensity]
-    const heatPoints = points.map(p => {
+    // Έλεγχος αν το L.idwLayer υπάρχει
+    if (!L.idwLayer) {
+        console.warn("L.idwLayer not found. Ensure setupIDW ran correctly.");
+        return;
+    }
+
+    // Μετατροπή δεδομένων: [lat, lon, value]
+    const idwPoints = points.map(p => {
         const db = parseFloat(p.properties.noise_db_val);
         const lat = p.geometry.coordinates[1];
         const lon = p.geometry.coordinates[0];
         
-        // Κανονικοποίηση Έντασης για το Heatmap (0.0 - 1.0)
-        // Υποθέτουμε ότι το εύρος ενδιαφέροντος είναι 30dB έως 90dB
-        // Τιμές < 30 γίνονται 0, τιμές > 90 γίνονται 1
-        const intensity = Math.min(Math.max((db - 30) / 60, 0.0), 1.0);
+        if (isNaN(db) || isNaN(lat) || isNaN(lon)) return null;
         
-        return [lat, lon, intensity];
+        // Clamping (30-100dB)
+        const val = Math.max(30, Math.min(100, db)); 
+        return [lat, lon, val];
+    }).filter(Boolean);
+
+    if (idwPoints.length === 0) return;
+
+    // --- ΑΚΡΙΒΗΣ ΑΝΤΙΣΤΟΙΧΙΣΗ ΧΡΩΜΑΤΩΝ (GRADIENT) ---
+    const exactGradient = {
+        0.0:  '#047857', // 30dB
+        0.14: '#047857', // 40dB
+        0.21: '#10b981', // 45dB
+        0.28: '#22c55e', // 50dB
+        0.35: '#84cc16', // 55dB
+        0.42: '#facc15', // 60dB
+        0.50: '#fab115', // 65dB
+        0.57: '#fb923c', // 70dB
+        0.64: '#ea580c', // 75dB
+        0.71: '#dc2626', // 80dB
+        0.85: '#7f1d1d', // >80dB
+        1.0:  '#7f1d1d'  // 100dB
+    };
+
+    // Δημιουργία Raster IDW Layer
+    const idw = L.idwLayer(idwPoints, {
+        opacity: 0.6, 
+        cellSize: 7,        
+        exp: 3,             
+        max: 100,           
+        maxDistance: 0.0015, // ~150 μέτρα (Maisonneuve et al. 2010)
+        minValue: 30,       
+        maxValue: 100,      
+        gradient: exactGradient
     });
+    
+    idw.addTo(map);
 
-    // Δημιουργία του HeatLayer με τις 10 αποχρώσεις
-    const heat = L.heatLayer(heatPoints, {
-        radius: 30,      
-        blur: 20,        
-        maxZoom: 16,     
-        max: 1.0,        
-        // Gradient που αντιστοιχεί στα χρώματα του AnalysisPage
-        gradient: {      
-            0.0: '#047857', // < 40 dB (Emerald 700)
-            0.15: '#10b981', // 41-45 dB (Emerald 500)
-            0.25: '#22c55e', // 46-50 dB (Green 500)
-            0.35: '#84cc16', // 51-55 dB (Lime 500)
-            0.45: '#facc15', // 56-60 dB (Yellow 400)
-            0.55: '#ca8a04', // 61-65 dB (Yellow 600)
-            0.65: '#fb923c', // 66-70 dB (Orange 400)
-            0.75: '#ea580c', // 71-75 dB (Orange 600)
-            0.85: '#dc2626', // 76-80 dB (Red 600)
-            0.95: '#7f1d1d'  // > 80 dB (Red 900)
-        }
-    }).addTo(map);
-
-    return () => {
-      map.removeLayer(heat);
+    return () => { 
+        if (map.hasLayer(idw)) map.removeLayer(idw); 
     };
   }, [points, map]);
 
   return null;
 };
 
+// --- COMPONENT: HEATMAP LAYER (DENSITY) ---
+const HeatmapLayer = ({ points }) => {
+    const map = useMap();
+    useEffect(() => {
+        if (!points || points.length === 0 || !L.heatLayer) return;
+
+        const heatPoints = points.map(p => {
+            const lat = p.geometry.coordinates[1];
+            const lon = p.geometry.coordinates[0];
+            return [lat, lon, 0.8]; // Σταθερή ένταση
+        });
+
+        const heat = L.heatLayer(heatPoints, {
+            radius: 30, blur: 20, maxZoom: 15, max: 1.0,
+            gradient: { 0.4: 'blue', 0.65: 'lime', 1: 'red' }
+        });
+        
+        heat.addTo(map);
+
+        return () => { 
+            if (map.hasLayer(heat)) map.removeLayer(heat); 
+        };
+    }, [points, map]);
+    return null;
+};
+
 // --- MAIN MAP COMPONENT ---
 export function AnalysisMap({ reports = [], mode = 'points' }) {
   
-  // Χρωματισμός για τα Clusters (Points Mode) - Ακριβής αντιστοίχιση με Legend
   const getColor = (db) => {
-    if (db > 80) return '#7f1d1d'; // > 80 dB (Red 900)
-    if (db > 75) return '#dc2626'; // 76-80 dB (Red 600)
-    if (db > 70) return '#ea580c'; // 71-75 dB (Orange 600)
-    if (db > 65) return '#fb923c'; // 66-70 dB (Orange 400)
-    if (db > 60) return '#ca8a04'; // 61-65 dB (Yellow 600)
-    if (db > 55) return '#facc15'; // 56-60 dB (Yellow 400)
-    if (db > 50) return '#84cc16'; // 51-55 dB (Lime 500)
-    if (db > 45) return '#22c55e'; // 46-50 dB (Green 500)
-    if (db > 40) return '#10b981'; // 41-45 dB (Emerald 500)
-    return '#047857';              // < 40 dB (Emerald 700)
+    if (db > 80) return '#7f1d1d'; if (db > 75) return '#dc2626'; if (db > 70) return '#ea580c';
+    if (db > 65) return '#fb923c'; if (db > 60) return '#fab115'; if (db > 55) return '#facc15';
+    if (db > 50) return '#84cc16'; if (db > 45) return '#22c55e'; if (db > 40) return '#10b981';
+    return '#047857';
   };
 
   const getSourceLabel = (source) => {
     const mapping = {
-      'nature': 'Φυσικό Περιβάλλον',
-      'traffic': 'Οδική Κυκλοφορία',
-      'construction': 'Εργοτάξιο / Κατασκευές',
-      'music': 'Έντονη Μουσική / Διασκέδαση',
-      'human': 'Ανθρώπινη Ομιλία / Πλήθος',
-      'industrial': 'Βιομηχανικός Θόρυβος',
-      'other': 'Άλλο'
+      'nature': 'Φυσικό Περιβάλλον', 'traffic': 'Οδική Κυκλοφορία',
+      'construction': 'Εργοτάξιο', 'music': 'Μουσική',
+      'human': 'Ανθρώπινη Ομιλία', 'industrial': 'Βιομηχανικός', 'other': 'Άλλο'
     };
     return mapping[source?.toLowerCase()] || source || 'Άγνωστο';
   };
@@ -104,77 +142,57 @@ export function AnalysisMap({ reports = [], mode = 'points' }) {
           <LayersControl.BaseLayer checked name="OpenStreetMap">
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap contributors' />
           </LayersControl.BaseLayer>
-          
           <LayersControl.BaseLayer name="Dark Matter">
-            <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" attribution='&copy; OpenStreetMap & CartoDB' />
+            <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" attribution='&copy; CartoDB' />
           </LayersControl.BaseLayer>
-
-          <LayersControl.Overlay checked name="Δεδομένα Θορύβου">
-            <React.Fragment>
-                {/* MODE 1: POINTS */}
-                {mode === 'points' && (
-                    <React.Fragment>
-                      {reports.map((feature, index) => {
-                        const coords = feature.geometry.coordinates;
-                        const lat = coords[1];
-                        const lon = coords[0];
-                        const props = feature.properties;
-                        const dbVal = parseFloat(props.noise_db_val); 
-                        const color = getColor(dbVal);
-
-                        return (
-                          <CircleMarker
-                            key={props.report_id || index}
-                            center={[lat, lon]}
-                            pathOptions={{ 
-                              color: 'white', 
-                              weight: 1, 
-                              fillColor: color, 
-                              fillOpacity: 0.9 
-                            }}
-                            radius={8} 
-                          >
-                            <Popup>
-                              <div className="p-1 min-w-[200px]">
-                                <div className="flex items-center justify-between border-b pb-2 mb-2 border-gray-200">
-                                  <span className="font-bold text-lg text-gray-800">{dbVal} dB</span>
-                                  <span className="text-xs px-2 py-1 rounded text-white" style={{ backgroundColor: color }}>
-                                    {dbVal > 80 ? 'Επικίνδυνο' : dbVal > 65 ? 'Υψηλό' : dbVal > 50 ? 'Μέτριο' : 'Χαμηλό'}
-                                  </span>
-                                </div>
-                                <div className="text-sm space-y-2 text-gray-700">
-                                  <p>🕒 {new Date(props.rec_time).toLocaleString('el-GR')}</p>
-                                  <p>📢 {getSourceLabel(props.noise_source)}</p>
-                                  <p>🔉 Υπ. Ενόχληση: <strong>{props.annoyance_level || '-'}</strong>/5</p>
-                                </div>
-                              </div>
-                            </Popup>
-                          </CircleMarker>
-                        );
-                      })}
-                    </React.Fragment>
-                )}
-
-                {/* MODE 2: HEATMAP */}
-                {mode === 'heatmap' && (
-                    <HeatmapLayer points={reports} />
-                )}
-            </React.Fragment>
-          </LayersControl.Overlay>
-
         </LayersControl>
+
+        {/* --- DATA LAYERS (Rendered Directly based on Mode) --- */}
+        
+        {/* 1. POINTS LAYER */}
+        {mode === 'points' && (
+            <>
+               {reports.map((feature, index) => {
+                  const coords = feature.geometry.coordinates;
+                  const dbVal = parseFloat(feature.properties.noise_db_val); 
+                  const color = getColor(dbVal);
+                  return (
+                    <CircleMarker
+                      key={feature.properties.report_id || index}
+                      center={[coords[1], coords[0]]}
+                      pathOptions={{ color: 'white', weight: 1, fillColor: color, fillOpacity: 0.9 }}
+                      radius={8} 
+                    >
+                      <Popup>
+                        <div className="p-1 min-w-[200px]">
+                          <div className="flex justify-between border-b pb-1 mb-1">
+                            <span className="font-bold">{dbVal} dB</span>
+                            <span className="text-xs px-2 rounded text-white" style={{ backgroundColor: color }}>
+                              {dbVal > 65 ? 'Υψηλό' : 'Χαμηλό'}
+                            </span>
+                          </div>
+                          <div className="text-sm">
+                            <p>{new Date(feature.properties.rec_time).toLocaleDateString()}</p>
+                            <p>{getSourceLabel(feature.properties.noise_source)}</p>
+                          </div>
+                        </div>
+                      </Popup>
+                    </CircleMarker>
+                  );
+                })}
+            </>
+        )}
+
+        {/* 2. HEATMAP LAYER */}
+        {mode === 'heatmap' && <HeatmapLayer points={reports} />}
+
+        {/* 3. IDW LAYER */}
+        {mode === 'idw' && <IDWLayer points={reports} />}
       </MapContainer>
       
-      {/* Στατιστικό στο κάτω μέρος */}
-      <div className="absolute bottom-6 left-6 z-[900] bg-white bg-opacity-90 backdrop-blur px-4 py-3 rounded-lg shadow-xl border border-gray-200 text-sm flex items-center gap-3">
-        <div className="flex flex-col">
-            <span className="text-xs text-gray-500 uppercase font-bold tracking-wider">Εμφανιζονται</span>
-            <span className="font-bold text-2xl text-cyan-700">{reports.length}</span>
-        </div>
-        <div className="h-8 w-px bg-gray-300 mx-1"></div>
-        <div className="text-xs text-gray-600">
-            μετρήσεις<br/>στο χάρτη
-        </div>
+      {/* Footer Info */}
+      <div className="absolute bottom-6 left-6 z-[900] bg-white/90 backdrop-blur px-4 py-2 rounded-lg shadow border border-gray-200 text-sm">
+        <span className="font-bold text-cyan-700">{reports.length}</span> μετρήσεις
       </div>
     </div>
   );
